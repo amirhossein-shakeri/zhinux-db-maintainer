@@ -1,11 +1,12 @@
-package datasource
+package database
 
 import "time"
 
-type DataSource struct {
-	ID       string
-	Title    string
-	Typ      DataSourceType
+type Database struct {
+	ID    string
+	Title string
+	Typ   DatabaseType
+
 	Host     string
 	Port     uint
 	User     string
