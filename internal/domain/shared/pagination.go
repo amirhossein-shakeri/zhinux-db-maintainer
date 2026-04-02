@@ -16,4 +16,5 @@ type Pagination struct {
 type Result[T any] struct {
 	Pagination Pagination
 	Items      []T
+	Total      int
 }

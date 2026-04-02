@@ -10,3 +10,6 @@ CREATE TABLE databases (
     updated_at TIMESTAMP NOT NULL,
     deleted_at TIMESTAMP
 );
+
+-- todo: How about migrations or schema changes?
+-- todo: How about idempotency and `IF NOT EXISTS`
