@@ -12,10 +12,18 @@ type databaseRepositoryImpl struct {
 	q *Queries
 }
 
+// TODO: Add logging
+
 func NewDatabaseRepository(pool *pgxpool.Pool) outbound_ports.DatabaseRepository {
 	return &databaseRepositoryImpl{
 		q: New(pool),
 	}
+}
+
+func (r *databaseRepositoryImpl) Save(
+	ctx context.Context, db *database.Database,
+) error {
+	//
 }
 
 func (r *databaseRepositoryImpl) FindByID(

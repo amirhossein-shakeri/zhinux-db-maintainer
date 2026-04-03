@@ -3,10 +3,10 @@ package restore
 import "time"
 
 type RestoreJob struct {
-	ID             string
-	ArtifactID     string
-	TargetDatabase string // todo: DB ID?
-	Status         RestoreStatus
-	StartedAt      *time.Time
-	FinishedAt     *time.Time
+	ID               string
+	ArtifactID       string
+	TargetDatabaseID string
+	Status           RestoreStatus
+	StartedAt        *time.Time
+	FinishedAt       *time.Time
 }

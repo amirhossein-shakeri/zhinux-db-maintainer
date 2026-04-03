@@ -2,10 +2,52 @@ version: "2"
 
 sql:
   - engine: "postgresql"
-    schema: "internal/adapters/db/postgres/schema"
-    queries: "internal/adapters/db/postgres/queries"
+    schema:
+      - "internal/adapters/db/postgres/sql/schema/shared"
+      - "internal/adapters/db/postgres/sql/schema/database"
+    queries:
+      - "internal/adapters/db/postgres/sql/queries/database"
     gen:
       go:
-        package: "postgres"
-        out: "internal/adapters/db/postgres"
+        package: "databaseq"
+        out: "internal/adapters/db/postgres/gen/database"
         sql_package: "pgx/v5"
+        emit_interface: true
+        emit_json_tags: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+
+  - engine: "postgresql"
+    schema:
+      - "internal/adapters/db/postgres/sql/schema/shared"
+      - "internal/adapters/db/postgres/sql/schema/database"
+      - "internal/adapters/db/postgres/sql/schema/backup"
+    queries:
+      - "internal/adapters/db/postgres/sql/queries/backup"
+    gen:
+      go:
+        package: "backupq"
+        out: "internal/adapters/db/postgres/gen/backup"
+        sql_package: "pgx/v5"
+        emit_interface: true
+        emit_json_tags: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+
+  - engine: "postgresql"
+    schema:
+      - "internal/adapters/db/postgres/sql/schema/shared"
+      - "internal/adapters/db/postgres/sql/schema/database"
+      - "internal/adapters/db/postgres/sql/schema/backup"
+      - "internal/adapters/db/postgres/sql/schema/restore"
+    queries:
+      - "internal/adapters/db/postgres/sql/queries/restore"
+    gen:
+      go:
+        package: "restoreq"
+        out: "internal/adapters/db/postgres/gen/restore"
+        sql_package: "pgx/v5"
+        emit_interface: true
+        emit_json_tags: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true

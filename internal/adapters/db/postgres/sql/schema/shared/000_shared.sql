@@ -1,0 +1,2 @@
+-- Shared SQL primitives live here.
+-- Keep this folder for cross-domain objects that must be loaded before specific domain schema.
