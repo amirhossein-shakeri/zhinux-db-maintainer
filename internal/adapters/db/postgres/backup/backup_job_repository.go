@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/backup"
-	outbound_ports "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/ports/outbound"
+	outboundports "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/ports/outbound"
+	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -15,7 +16,7 @@ type backupJobRepositoryImpl struct {
 	pool *pgxpool.Pool
 }
 
-func NewBackupJobRepository(pool *pgxpool.Pool) outbound_ports.BackupJobRepository {
+func NewBackupJobRepository(pool *pgxpool.Pool) outboundports.BackupJobRepository {
 	return &backupJobRepositoryImpl{pool: pool}
 }
 
@@ -24,9 +25,15 @@ func (r *backupJobRepositoryImpl) Save(ctx context.Context, job *backup.BackupJo
 		return fmt.Errorf("backup job is nil")
 	}
 
-	_, err := r.pool.Exec(ctx, backupJobUpsertSQL,
+	publicID, err := parsePublicID(job.PublicID)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.pool.Exec(ctx, backupJobUpsertSQL,
 		job.ID,
-		job.DatabaseID,
+		publicID,
+		int64(job.DatabaseID),
 		string(job.TriggerType),
 		string(job.Status),
 		job.StartedAt,
@@ -51,7 +58,12 @@ func (r *backupJobRepositoryImpl) FindByID(ctx context.Context, id string) (*bac
 }
 
 func (r *backupJobRepositoryImpl) ListByDatabaseID(ctx context.Context, databaseID string) ([]*backup.BackupJob, error) {
-	rows, err := r.pool.Query(ctx, backupJobListByDatabaseIDSQL, databaseID)
+	parsedDatabaseID, err := parseDatabaseID(databaseID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.pool.Query(ctx, backupJobListByDatabaseIDSQL, parsedDatabaseID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +103,12 @@ func scanBackupJob(row interface {
 	var item backup.BackupJob
 	var trigger string
 	var status string
+	var databaseID int64
 
 	err := row.Scan(
 		&item.ID,
-		&item.DatabaseID,
+		&item.PublicID,
+		&databaseID,
 		&trigger,
 		&status,
 		&item.StartedAt,
@@ -105,6 +119,7 @@ func scanBackupJob(row interface {
 		return nil, err
 	}
 
+	item.DatabaseID = zhinuxtypes.ID(databaseID)
 	item.TriggerType = backup.BackupTrigger(trigger)
 	item.Status = backup.BackupStatus(status)
 	return &item, nil
@@ -113,10 +128,11 @@ func scanBackupJob(row interface {
 const (
 	backupJobUpsertSQL = `
 INSERT INTO backup_jobs (
-	id, database_id, trigger_type, status, started_at, finished_at, artifact_id, created_at, updated_at
+	id, public_id, database_id, trigger_type, status, started_at, finished_at, artifact_id, created_at, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9
+	$1, COALESCE($2, gen_random_uuid()), $3, $4, $5, $6, $7, $8, $9, $10
 ) ON CONFLICT (id) DO UPDATE SET
+	public_id = EXCLUDED.public_id,
 	status = EXCLUDED.status,
 	started_at = EXCLUDED.started_at,
 	finished_at = EXCLUDED.finished_at,
@@ -125,13 +141,13 @@ INSERT INTO backup_jobs (
 `
 
 	backupJobFindByIDSQL = `
-SELECT id, database_id, trigger_type, status, started_at, finished_at, artifact_id
+SELECT id, public_id::text, database_id, trigger_type, status, started_at, finished_at, artifact_id
 FROM backup_jobs
 WHERE id = $1
 `
 
 	backupJobListByDatabaseIDSQL = `
-SELECT id, database_id, trigger_type, status, started_at, finished_at, artifact_id
+SELECT id, public_id::text, database_id, trigger_type, status, started_at, finished_at, artifact_id
 FROM backup_jobs
 WHERE database_id = $1
 ORDER BY created_at DESC

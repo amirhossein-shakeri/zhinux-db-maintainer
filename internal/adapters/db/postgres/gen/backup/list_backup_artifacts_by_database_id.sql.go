@@ -12,7 +12,7 @@ import (
 )
 
 const listBackupArtifactsByDatabaseID = `-- name: ListBackupArtifactsByDatabaseID :many
-SELECT id, database_id, backup_job_id, storage_location, size_bytes, checksum, created_at, deleted_at
+SELECT id, public_id, database_id, backup_job_id, storage_location, size_bytes, checksum, created_at, deleted_at
 FROM backup_artifacts
 WHERE database_id = $1
 ORDER BY created_at DESC
@@ -20,7 +20,8 @@ ORDER BY created_at DESC
 
 type ListBackupArtifactsByDatabaseIDRow struct {
 	ID              string             `json:"id"`
-	DatabaseID      string             `json:"database_id"`
+	PublicID        pgtype.UUID        `json:"public_id"`
+	DatabaseID      int64              `json:"database_id"`
 	BackupJobID     string             `json:"backup_job_id"`
 	StorageLocation string             `json:"storage_location"`
 	SizeBytes       int64              `json:"size_bytes"`
@@ -29,7 +30,7 @@ type ListBackupArtifactsByDatabaseIDRow struct {
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 }
 
-func (q *Queries) ListBackupArtifactsByDatabaseID(ctx context.Context, databaseID string) ([]ListBackupArtifactsByDatabaseIDRow, error) {
+func (q *Queries) ListBackupArtifactsByDatabaseID(ctx context.Context, databaseID int64) ([]ListBackupArtifactsByDatabaseIDRow, error) {
 	rows, err := q.db.Query(ctx, listBackupArtifactsByDatabaseID, databaseID)
 	if err != nil {
 		return nil, err
@@ -40,6 +41,7 @@ func (q *Queries) ListBackupArtifactsByDatabaseID(ctx context.Context, databaseI
 		var i ListBackupArtifactsByDatabaseIDRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.PublicID,
 			&i.DatabaseID,
 			&i.BackupJobID,
 			&i.StorageLocation,

@@ -10,7 +10,7 @@ import (
 
 type Querier interface {
 	FindRestoreJobByID(ctx context.Context, id string) (FindRestoreJobByIDRow, error)
-	ListRestoreJobsByTargetDatabaseID(ctx context.Context, targetDatabaseID string) ([]ListRestoreJobsByTargetDatabaseIDRow, error)
+	ListRestoreJobsByTargetDatabaseID(ctx context.Context, targetDatabaseID int64) ([]ListRestoreJobsByTargetDatabaseIDRow, error)
 	MarkRestoreJobFinished(ctx context.Context, arg MarkRestoreJobFinishedParams) error
 	MarkRestoreJobStarted(ctx context.Context, arg MarkRestoreJobStartedParams) error
 	UpsertRestoreJob(ctx context.Context, arg UpsertRestoreJobParams) error

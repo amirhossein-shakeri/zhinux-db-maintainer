@@ -14,6 +14,7 @@ import (
 const upsertBackupArtifact = `-- name: UpsertBackupArtifact :exec
 INSERT INTO backup_artifacts (
     id,
+    public_id,
     database_id,
     backup_job_id,
     storage_location,
@@ -23,9 +24,10 @@ INSERT INTO backup_artifacts (
     deleted_at,
     updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (id) DO UPDATE
-SET storage_location = EXCLUDED.storage_location,
+SET public_id = EXCLUDED.public_id,
+    storage_location = EXCLUDED.storage_location,
     size_bytes = EXCLUDED.size_bytes,
     checksum = EXCLUDED.checksum,
     deleted_at = EXCLUDED.deleted_at,
@@ -34,7 +36,8 @@ SET storage_location = EXCLUDED.storage_location,
 
 type UpsertBackupArtifactParams struct {
 	ID              string             `json:"id"`
-	DatabaseID      string             `json:"database_id"`
+	PublicID        pgtype.UUID        `json:"public_id"`
+	DatabaseID      int64              `json:"database_id"`
 	BackupJobID     string             `json:"backup_job_id"`
 	StorageLocation string             `json:"storage_location"`
 	SizeBytes       int64              `json:"size_bytes"`
@@ -47,6 +50,7 @@ type UpsertBackupArtifactParams struct {
 func (q *Queries) UpsertBackupArtifact(ctx context.Context, arg UpsertBackupArtifactParams) error {
 	_, err := q.db.Exec(ctx, upsertBackupArtifact,
 		arg.ID,
+		arg.PublicID,
 		arg.DatabaseID,
 		arg.BackupJobID,
 		arg.StorageLocation,

@@ -1,4 +1,4 @@
--- name: ListActiveDatabases :many
+-- name: FindDatabaseByPublicID :one
 SELECT
     id,
     public_id,
@@ -13,8 +13,4 @@ SELECT
     deleted_at
 FROM databases
 WHERE
-    deleted_at IS NULL
-ORDER BY created_at DESC
-LIMIT $1
-OFFSET
-    $2;
+    public_id = $1;

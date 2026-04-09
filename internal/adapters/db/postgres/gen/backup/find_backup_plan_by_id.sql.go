@@ -7,22 +7,25 @@ package backupq
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const findBackupPlanByID = `-- name: FindBackupPlanByID :one
-SELECT id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
+SELECT id, public_id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
 FROM backup_plans
 WHERE id = $1
 `
 
 type FindBackupPlanByIDRow struct {
-	ID                 string `json:"id"`
-	DatabaseID         string `json:"database_id"`
-	Schedule           string `json:"schedule"`
-	Enabled            bool   `json:"enabled"`
-	RetentionPolicy    string `json:"retention_policy"`
-	CompressionEnabled bool   `json:"compression_enabled"`
-	EncryptionEnabled  bool   `json:"encryption_enabled"`
+	ID                 string      `json:"id"`
+	PublicID           pgtype.UUID `json:"public_id"`
+	DatabaseID         int64       `json:"database_id"`
+	Schedule           string      `json:"schedule"`
+	Enabled            bool        `json:"enabled"`
+	RetentionPolicy    string      `json:"retention_policy"`
+	CompressionEnabled bool        `json:"compression_enabled"`
+	EncryptionEnabled  bool        `json:"encryption_enabled"`
 }
 
 func (q *Queries) FindBackupPlanByID(ctx context.Context, id string) (FindBackupPlanByIDRow, error) {
@@ -30,6 +33,7 @@ func (q *Queries) FindBackupPlanByID(ctx context.Context, id string) (FindBackup
 	var i FindBackupPlanByIDRow
 	err := row.Scan(
 		&i.ID,
+		&i.PublicID,
 		&i.DatabaseID,
 		&i.Schedule,
 		&i.Enabled,

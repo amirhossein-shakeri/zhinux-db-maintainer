@@ -6,12 +6,15 @@ package databaseq
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
-	FindDatabaseByID(ctx context.Context, id int64) (FindDatabaseByIDRow, error)
+	FindDatabaseByID(ctx context.Context, id int64) (Database, error)
+	FindDatabaseByPublicID(ctx context.Context, publicID pgtype.UUID) (Database, error)
 	HardDeleteDatabase(ctx context.Context, id int64) error
-	ListActiveDatabases(ctx context.Context, arg ListActiveDatabasesParams) ([]ListActiveDatabasesRow, error)
+	ListActiveDatabases(ctx context.Context, arg ListActiveDatabasesParams) ([]Database, error)
 	RestoreDatabase(ctx context.Context, id int64) error
 	SoftDeleteDatabase(ctx context.Context, id int64) error
 	UpsertDatabase(ctx context.Context, arg UpsertDatabaseParams) error

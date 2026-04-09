@@ -1,32 +1,41 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
 
-	"github.com/amirhossein-shakeri/zhinux-platform/config"
-	"github.com/amirhossein-shakeri/zhinux-platform/logging"
+	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/app"
+	"github.com/amirhossein-shakeri/zhinux-platform/shutdown"
+)
+
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
 )
 
 func main() {
-	fmt.Println("Hello, World!")
+	rootCtx, stopSignal := shutdown.NotifyContext(context.Background())
+	defer stopSignal()
 
-	// Config
-	cfg, err := config.LoadBaseFromEnv()
+	application, err := app.New(rootCtx, app.NormalizeBuildInfo(app.BuildInfo{
+		Version:   version,
+		Commit:    commit,
+		BuildDate: buildDate,
+	}))
 	if err != nil {
-		log.Fatalf("Failed to load the config: %v", err)
+		log.Fatalf("bootstrap failed: %v", err)
 	}
 
-	// Logger
-	logger, err := logging.NewLogger(logging.LoggerOptions{
-		Level:       cfg.LogLevel,
-		Service:     cfg.ServiceName,
-		Development: cfg.Environment == "development",
-	})
-	if err != nil {
-		logger.Error("Failed to initialize logger", logging.KV("err", err))
-		panic(err)
+	if err := application.Start(); err != nil {
+		log.Fatalf("start application: %v", err)
 	}
 
-	// FFF
+	if err := application.Wait(rootCtx); err != nil {
+		log.Printf("runtime error: %v", err)
+	}
+
+	if err := application.Shutdown(); err != nil {
+		log.Printf("shutdown error: %v", err)
+	}
 }

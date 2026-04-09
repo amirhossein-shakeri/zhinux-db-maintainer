@@ -12,7 +12,7 @@ import (
 )
 
 const listRestoreJobsByTargetDatabaseID = `-- name: ListRestoreJobsByTargetDatabaseID :many
-SELECT id, artifact_id, target_database_id, status, started_at, finished_at
+SELECT id, public_id, artifact_id, target_database_id, status, started_at, finished_at
 FROM restore_jobs
 WHERE target_database_id = $1
 ORDER BY created_at DESC
@@ -20,14 +20,15 @@ ORDER BY created_at DESC
 
 type ListRestoreJobsByTargetDatabaseIDRow struct {
 	ID               string             `json:"id"`
+	PublicID         pgtype.UUID        `json:"public_id"`
 	ArtifactID       string             `json:"artifact_id"`
-	TargetDatabaseID string             `json:"target_database_id"`
+	TargetDatabaseID int64              `json:"target_database_id"`
 	Status           string             `json:"status"`
 	StartedAt        pgtype.Timestamptz `json:"started_at"`
 	FinishedAt       pgtype.Timestamptz `json:"finished_at"`
 }
 
-func (q *Queries) ListRestoreJobsByTargetDatabaseID(ctx context.Context, targetDatabaseID string) ([]ListRestoreJobsByTargetDatabaseIDRow, error) {
+func (q *Queries) ListRestoreJobsByTargetDatabaseID(ctx context.Context, targetDatabaseID int64) ([]ListRestoreJobsByTargetDatabaseIDRow, error) {
 	rows, err := q.db.Query(ctx, listRestoreJobsByTargetDatabaseID, targetDatabaseID)
 	if err != nil {
 		return nil, err
@@ -38,6 +39,7 @@ func (q *Queries) ListRestoreJobsByTargetDatabaseID(ctx context.Context, targetD
 		var i ListRestoreJobsByTargetDatabaseIDRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.PublicID,
 			&i.ArtifactID,
 			&i.TargetDatabaseID,
 			&i.Status,

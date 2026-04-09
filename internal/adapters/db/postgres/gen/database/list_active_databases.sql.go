@@ -7,16 +7,28 @@ package databaseq
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const listActiveDatabases = `-- name: ListActiveDatabases :many
-SELECT id, title, type, host, port, username, password, created_at, updated_at, deleted_at
+SELECT
+    id,
+    public_id,
+    title,
+    type,
+    host,
+    port,
+    username,
+    password,
+    created_at,
+    updated_at,
+    deleted_at
 FROM databases
-WHERE deleted_at IS NULL
+WHERE
+    deleted_at IS NULL
 ORDER BY created_at DESC
-LIMIT $1 OFFSET $2
+LIMIT $1
+OFFSET
+    $2
 `
 
 type ListActiveDatabasesParams struct {
@@ -24,30 +36,18 @@ type ListActiveDatabasesParams struct {
 	Offset int32 `json:"offset"`
 }
 
-type ListActiveDatabasesRow struct {
-	ID        int64              `json:"id"`
-	Title     string             `json:"title"`
-	Type      string             `json:"type"`
-	Host      string             `json:"host"`
-	Port      int32              `json:"port"`
-	Username  string             `json:"username"`
-	Password  string             `json:"password"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
-}
-
-func (q *Queries) ListActiveDatabases(ctx context.Context, arg ListActiveDatabasesParams) ([]ListActiveDatabasesRow, error) {
+func (q *Queries) ListActiveDatabases(ctx context.Context, arg ListActiveDatabasesParams) ([]Database, error) {
 	rows, err := q.db.Query(ctx, listActiveDatabases, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListActiveDatabasesRow{}
+	items := []Database{}
 	for rows.Next() {
-		var i ListActiveDatabasesRow
+		var i Database
 		if err := rows.Scan(
 			&i.ID,
+			&i.PublicID,
 			&i.Title,
 			&i.Type,
 			&i.Host,

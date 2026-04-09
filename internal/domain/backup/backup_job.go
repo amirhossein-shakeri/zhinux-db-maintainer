@@ -1,10 +1,16 @@
 package backup
 
-import "time"
+import (
+	"time"
+
+	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
+)
 
 type BackupJob struct {
-	ID          string
-	DatabaseID  string
+	ID       string
+	PublicID string
+
+	DatabaseID  zhinuxtypes.ID
 	TriggerType BackupTrigger
 	Status      BackupStatus
 	StartedAt   *time.Time

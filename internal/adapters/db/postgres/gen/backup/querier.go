@@ -13,9 +13,9 @@ type Querier interface {
 	FindBackupArtifactByID(ctx context.Context, id string) (FindBackupArtifactByIDRow, error)
 	FindBackupJobByID(ctx context.Context, id string) (FindBackupJobByIDRow, error)
 	FindBackupPlanByID(ctx context.Context, id string) (FindBackupPlanByIDRow, error)
-	ListBackupArtifactsByDatabaseID(ctx context.Context, databaseID string) ([]ListBackupArtifactsByDatabaseIDRow, error)
-	ListBackupJobsByDatabaseID(ctx context.Context, databaseID string) ([]ListBackupJobsByDatabaseIDRow, error)
-	ListBackupPlansByDatabaseID(ctx context.Context, databaseID string) ([]ListBackupPlansByDatabaseIDRow, error)
+	ListBackupArtifactsByDatabaseID(ctx context.Context, databaseID int64) ([]ListBackupArtifactsByDatabaseIDRow, error)
+	ListBackupJobsByDatabaseID(ctx context.Context, databaseID int64) ([]ListBackupJobsByDatabaseIDRow, error)
+	ListBackupPlansByDatabaseID(ctx context.Context, databaseID int64) ([]ListBackupPlansByDatabaseIDRow, error)
 	MarkBackupJobFinished(ctx context.Context, arg MarkBackupJobFinishedParams) error
 	MarkBackupJobStarted(ctx context.Context, arg MarkBackupJobStartedParams) error
 	SoftDeleteBackupArtifact(ctx context.Context, id string) error

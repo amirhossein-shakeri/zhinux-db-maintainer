@@ -7,7 +7,8 @@ import (
 
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/backup"
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/shared"
-	outbound_ports "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/ports/outbound"
+	outboundports "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/ports/outbound"
+	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,7 +17,7 @@ type backupPlanRepositoryImpl struct {
 	pool *pgxpool.Pool
 }
 
-func NewBackupPlanRepository(pool *pgxpool.Pool) outbound_ports.BackupPlanRepository {
+func NewBackupPlanRepository(pool *pgxpool.Pool) outboundports.BackupPlanRepository {
 	return &backupPlanRepositoryImpl{pool: pool}
 }
 
@@ -26,9 +27,15 @@ func (r *backupPlanRepositoryImpl) Save(ctx context.Context, plan *backup.Backup
 	}
 
 	now := time.Now().UTC()
-	_, err := r.pool.Exec(ctx, backupPlanUpsertSQL,
+	publicID, err := parsePublicID(plan.PublicID)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.pool.Exec(ctx, backupPlanUpsertSQL,
 		plan.ID,
-		plan.DatabaseID,
+		publicID,
+		int64(plan.DatabaseID),
 		plan.Schedule,
 		plan.Enabled,
 		string(plan.RetentionPolicy),
@@ -53,7 +60,12 @@ func (r *backupPlanRepositoryImpl) FindByID(ctx context.Context, id string) (*ba
 }
 
 func (r *backupPlanRepositoryImpl) ListByDatabaseID(ctx context.Context, databaseID string) ([]*backup.BackupPlan, error) {
-	rows, err := r.pool.Query(ctx, backupPlanListByDatabaseIDSQL, databaseID)
+	parsedDatabaseID, err := parseDatabaseID(databaseID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.pool.Query(ctx, backupPlanListByDatabaseIDSQL, parsedDatabaseID)
 	if err != nil {
 		return nil, err
 	}
@@ -80,10 +92,12 @@ func scanBackupPlan(row interface {
 }) (*backup.BackupPlan, error) {
 	var item backup.BackupPlan
 	var retentionPolicy string
+	var databaseID int64
 
 	err := row.Scan(
 		&item.ID,
-		&item.DatabaseID,
+		&item.PublicID,
+		&databaseID,
 		&item.Schedule,
 		&item.Enabled,
 		&retentionPolicy,
@@ -94,6 +108,7 @@ func scanBackupPlan(row interface {
 		return nil, err
 	}
 
+	item.DatabaseID = zhinuxtypes.ID(databaseID)
 	item.RetentionPolicy = shared.RetentionPolicy(retentionPolicy)
 	return &item, nil
 }
@@ -101,10 +116,11 @@ func scanBackupPlan(row interface {
 const (
 	backupPlanUpsertSQL = `
 INSERT INTO backup_plans (
-	id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled, created_at, updated_at
+	id, public_id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled, created_at, updated_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8, $9
+	$1, COALESCE($2, gen_random_uuid()), $3, $4, $5, $6, $7, $8, $9, $10
 ) ON CONFLICT (id) DO UPDATE SET
+	public_id = EXCLUDED.public_id,
 	schedule = EXCLUDED.schedule,
 	enabled = EXCLUDED.enabled,
 	retention_policy = EXCLUDED.retention_policy,
@@ -114,13 +130,13 @@ INSERT INTO backup_plans (
 `
 
 	backupPlanFindByIDSQL = `
-SELECT id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
+SELECT id, public_id::text, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
 FROM backup_plans
 WHERE id = $1
 `
 
 	backupPlanListByDatabaseIDSQL = `
-SELECT id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
+SELECT id, public_id::text, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
 FROM backup_plans
 WHERE database_id = $1
 ORDER BY created_at DESC

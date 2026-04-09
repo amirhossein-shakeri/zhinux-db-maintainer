@@ -1,8 +1,17 @@
 CREATE TABLE IF NOT EXISTS restore_jobs (
     id TEXT PRIMARY KEY,
+    public_id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid (),
     artifact_id TEXT NOT NULL REFERENCES backup_artifacts (id) ON DELETE RESTRICT,
-    target_database_id TEXT NOT NULL REFERENCES databases (id) ON DELETE CASCADE,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'in_progress', 'success', 'failed', 'canceled')),
+    target_database_id BIGINT NOT NULL REFERENCES databases (id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (
+        status IN (
+            'pending',
+            'in_progress',
+            'success',
+            'failed',
+            'canceled'
+        )
+    ),
     started_at TIMESTAMPTZ,
     finished_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL,
@@ -10,5 +19,9 @@ CREATE TABLE IF NOT EXISTS restore_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_restore_jobs_target_database_id ON restore_jobs (target_database_id);
+
+CREATE INDEX IF NOT EXISTS idx_restore_jobs_public_id ON restore_jobs (public_id);
+
 CREATE INDEX IF NOT EXISTS idx_restore_jobs_status ON restore_jobs (status);
+
 CREATE INDEX IF NOT EXISTS idx_restore_jobs_artifact_id ON restore_jobs (artifact_id);

@@ -11,9 +11,11 @@ import (
 
 const softDeleteDatabase = `-- name: SoftDeleteDatabase :exec
 UPDATE databases
-SET deleted_at = NOW(),
+SET
+    deleted_at = NOW(),
     updated_at = NOW()
-WHERE id = $1
+WHERE
+    id = $1
 `
 
 func (q *Queries) SoftDeleteDatabase(ctx context.Context, id int64) error {

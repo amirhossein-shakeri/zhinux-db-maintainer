@@ -7,8 +7,8 @@ import (
 )
 
 type Database struct {
-	ID types.ID // Internal ID(Fast joins)
-	// PublicID string   // Exposed UUID at public APIs(Safe public identifiers)
+	ID       types.ID // Internal ID(Fast joins)
+	PublicID string   // Exposed UUID at public APIs(Safe public identifiers)
 
 	Title string
 	Typ   DatabaseType

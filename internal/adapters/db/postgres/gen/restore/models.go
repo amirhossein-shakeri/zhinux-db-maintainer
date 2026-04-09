@@ -10,7 +10,8 @@ import (
 
 type BackupArtifact struct {
 	ID              string             `json:"id"`
-	DatabaseID      string             `json:"database_id"`
+	PublicID        pgtype.UUID        `json:"public_id"`
+	DatabaseID      int64              `json:"database_id"`
 	BackupJobID     string             `json:"backup_job_id"`
 	StorageLocation string             `json:"storage_location"`
 	SizeBytes       int64              `json:"size_bytes"`
@@ -22,7 +23,8 @@ type BackupArtifact struct {
 
 type BackupJob struct {
 	ID          string             `json:"id"`
-	DatabaseID  string             `json:"database_id"`
+	PublicID    pgtype.UUID        `json:"public_id"`
+	DatabaseID  int64              `json:"database_id"`
 	TriggerType string             `json:"trigger_type"`
 	Status      string             `json:"status"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
@@ -34,7 +36,8 @@ type BackupJob struct {
 
 type BackupPlan struct {
 	ID                 string             `json:"id"`
-	DatabaseID         string             `json:"database_id"`
+	PublicID           pgtype.UUID        `json:"public_id"`
+	DatabaseID         int64              `json:"database_id"`
 	Schedule           string             `json:"schedule"`
 	Enabled            bool               `json:"enabled"`
 	RetentionPolicy    string             `json:"retention_policy"`
@@ -60,8 +63,9 @@ type Database struct {
 
 type RestoreJob struct {
 	ID               string             `json:"id"`
+	PublicID         pgtype.UUID        `json:"public_id"`
 	ArtifactID       string             `json:"artifact_id"`
-	TargetDatabaseID string             `json:"target_database_id"`
+	TargetDatabaseID int64              `json:"target_database_id"`
 	Status           string             `json:"status"`
 	StartedAt        pgtype.Timestamptz `json:"started_at"`
 	FinishedAt       pgtype.Timestamptz `json:"finished_at"`

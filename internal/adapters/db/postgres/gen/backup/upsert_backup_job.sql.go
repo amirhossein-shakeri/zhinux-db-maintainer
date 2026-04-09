@@ -14,6 +14,7 @@ import (
 const upsertBackupJob = `-- name: UpsertBackupJob :exec
 INSERT INTO backup_jobs (
     id,
+    public_id,
     database_id,
     trigger_type,
     status,
@@ -23,9 +24,10 @@ INSERT INTO backup_jobs (
     created_at,
     updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (id) DO UPDATE
-SET status = EXCLUDED.status,
+SET public_id = EXCLUDED.public_id,
+    status = EXCLUDED.status,
     started_at = EXCLUDED.started_at,
     finished_at = EXCLUDED.finished_at,
     artifact_id = EXCLUDED.artifact_id,
@@ -34,7 +36,8 @@ SET status = EXCLUDED.status,
 
 type UpsertBackupJobParams struct {
 	ID          string             `json:"id"`
-	DatabaseID  string             `json:"database_id"`
+	PublicID    pgtype.UUID        `json:"public_id"`
+	DatabaseID  int64              `json:"database_id"`
 	TriggerType string             `json:"trigger_type"`
 	Status      string             `json:"status"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
@@ -47,6 +50,7 @@ type UpsertBackupJobParams struct {
 func (q *Queries) UpsertBackupJob(ctx context.Context, arg UpsertBackupJobParams) error {
 	_, err := q.db.Exec(ctx, upsertBackupJob,
 		arg.ID,
+		arg.PublicID,
 		arg.DatabaseID,
 		arg.TriggerType,
 		arg.Status,

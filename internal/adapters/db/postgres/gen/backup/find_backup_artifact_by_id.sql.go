@@ -12,14 +12,15 @@ import (
 )
 
 const findBackupArtifactByID = `-- name: FindBackupArtifactByID :one
-SELECT id, database_id, backup_job_id, storage_location, size_bytes, checksum, created_at, deleted_at
+SELECT id, public_id, database_id, backup_job_id, storage_location, size_bytes, checksum, created_at, deleted_at
 FROM backup_artifacts
 WHERE id = $1
 `
 
 type FindBackupArtifactByIDRow struct {
 	ID              string             `json:"id"`
-	DatabaseID      string             `json:"database_id"`
+	PublicID        pgtype.UUID        `json:"public_id"`
+	DatabaseID      int64              `json:"database_id"`
 	BackupJobID     string             `json:"backup_job_id"`
 	StorageLocation string             `json:"storage_location"`
 	SizeBytes       int64              `json:"size_bytes"`
@@ -33,6 +34,7 @@ func (q *Queries) FindBackupArtifactByID(ctx context.Context, id string) (FindBa
 	var i FindBackupArtifactByIDRow
 	err := row.Scan(
 		&i.ID,
+		&i.PublicID,
 		&i.DatabaseID,
 		&i.BackupJobID,
 		&i.StorageLocation,

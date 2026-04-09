@@ -1,10 +1,16 @@
 package backup
 
-import "time"
+import (
+	"time"
+
+	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
+)
 
 type BackupArtifact struct {
-	ID              string
-	DatabaseID      string
+	ID       string
+	PublicID string
+
+	DatabaseID      zhinuxtypes.ID
 	BackupJobID     string
 	StorageLocation string // todo: Use more detailed address? struct {Provider, Path, Bucket}
 	Size            int

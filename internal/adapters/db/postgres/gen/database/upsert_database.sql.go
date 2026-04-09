@@ -12,21 +12,37 @@ import (
 )
 
 const upsertDatabase = `-- name: UpsertDatabase :exec
-INSERT INTO databases (
-    id,
-    title,
-    type,
-    host,
-    port,
-    username,
-    password,
-    created_at,
-    updated_at,
-    deleted_at
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-ON CONFLICT (id) DO UPDATE
-SET title = EXCLUDED.title,
+INSERT INTO
+    databases (
+        id,
+        public_id,
+        title,
+        type,
+        host,
+        port,
+        username,
+        password,
+        created_at,
+        updated_at,
+        deleted_at
+    )
+VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10,
+        $11
+    ) ON CONFLICT (id) DO
+UPDATE
+SET
+    public_id = EXCLUDED.public_id,
+    title = EXCLUDED.title,
     type = EXCLUDED.type,
     host = EXCLUDED.host,
     port = EXCLUDED.port,
@@ -38,6 +54,7 @@ SET title = EXCLUDED.title,
 
 type UpsertDatabaseParams struct {
 	ID        int64              `json:"id"`
+	PublicID  pgtype.UUID        `json:"public_id"`
 	Title     string             `json:"title"`
 	Type      string             `json:"type"`
 	Host      string             `json:"host"`
@@ -52,6 +69,7 @@ type UpsertDatabaseParams struct {
 func (q *Queries) UpsertDatabase(ctx context.Context, arg UpsertDatabaseParams) error {
 	_, err := q.db.Exec(ctx, upsertDatabase,
 		arg.ID,
+		arg.PublicID,
 		arg.Title,
 		arg.Type,
 		arg.Host,

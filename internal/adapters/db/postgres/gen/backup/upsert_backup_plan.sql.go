@@ -14,6 +14,7 @@ import (
 const upsertBackupPlan = `-- name: UpsertBackupPlan :exec
 INSERT INTO backup_plans (
     id,
+    public_id,
     database_id,
     schedule,
     enabled,
@@ -23,9 +24,10 @@ INSERT INTO backup_plans (
     created_at,
     updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (id) DO UPDATE
-SET schedule = EXCLUDED.schedule,
+SET public_id = EXCLUDED.public_id,
+    schedule = EXCLUDED.schedule,
     enabled = EXCLUDED.enabled,
     retention_policy = EXCLUDED.retention_policy,
     compression_enabled = EXCLUDED.compression_enabled,
@@ -35,7 +37,8 @@ SET schedule = EXCLUDED.schedule,
 
 type UpsertBackupPlanParams struct {
 	ID                 string             `json:"id"`
-	DatabaseID         string             `json:"database_id"`
+	PublicID           pgtype.UUID        `json:"public_id"`
+	DatabaseID         int64              `json:"database_id"`
 	Schedule           string             `json:"schedule"`
 	Enabled            bool               `json:"enabled"`
 	RetentionPolicy    string             `json:"retention_policy"`
@@ -48,6 +51,7 @@ type UpsertBackupPlanParams struct {
 func (q *Queries) UpsertBackupPlan(ctx context.Context, arg UpsertBackupPlanParams) error {
 	_, err := q.db.Exec(ctx, upsertBackupPlan,
 		arg.ID,
+		arg.PublicID,
 		arg.DatabaseID,
 		arg.Schedule,
 		arg.Enabled,

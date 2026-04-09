@@ -14,6 +14,7 @@ import (
 const upsertRestoreJob = `-- name: UpsertRestoreJob :exec
 INSERT INTO restore_jobs (
     id,
+    public_id,
     artifact_id,
     target_database_id,
     status,
@@ -22,9 +23,10 @@ INSERT INTO restore_jobs (
     created_at,
     updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (id) DO UPDATE
-SET status = EXCLUDED.status,
+SET public_id = EXCLUDED.public_id,
+    status = EXCLUDED.status,
     started_at = EXCLUDED.started_at,
     finished_at = EXCLUDED.finished_at,
     updated_at = EXCLUDED.updated_at
@@ -32,8 +34,9 @@ SET status = EXCLUDED.status,
 
 type UpsertRestoreJobParams struct {
 	ID               string             `json:"id"`
+	PublicID         pgtype.UUID        `json:"public_id"`
 	ArtifactID       string             `json:"artifact_id"`
-	TargetDatabaseID string             `json:"target_database_id"`
+	TargetDatabaseID int64              `json:"target_database_id"`
 	Status           string             `json:"status"`
 	StartedAt        pgtype.Timestamptz `json:"started_at"`
 	FinishedAt       pgtype.Timestamptz `json:"finished_at"`
@@ -44,6 +47,7 @@ type UpsertRestoreJobParams struct {
 func (q *Queries) UpsertRestoreJob(ctx context.Context, arg UpsertRestoreJobParams) error {
 	_, err := q.db.Exec(ctx, upsertRestoreJob,
 		arg.ID,
+		arg.PublicID,
 		arg.ArtifactID,
 		arg.TargetDatabaseID,
 		arg.Status,

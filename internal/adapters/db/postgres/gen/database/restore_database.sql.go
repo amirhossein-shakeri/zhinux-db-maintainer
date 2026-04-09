@@ -11,9 +11,11 @@ import (
 
 const restoreDatabase = `-- name: RestoreDatabase :exec
 UPDATE databases
-SET deleted_at = NULL,
+SET
+    deleted_at = NULL,
     updated_at = NOW()
-WHERE id = $1
+WHERE
+    id = $1
 `
 
 func (q *Queries) RestoreDatabase(ctx context.Context, id int64) error {

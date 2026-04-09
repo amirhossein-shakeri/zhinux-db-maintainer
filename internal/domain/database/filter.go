@@ -3,13 +3,14 @@ package database
 import "time"
 
 type Filter struct {
-	IDs      []string
-	Title    *string
-	Types    []DatabaseType
-	Host     *string
-	Port     *uint
-	User     *string
-	Password *string
+	IDs       []string
+	PublicIDs []string
+	Title     *string
+	Types     []DatabaseType
+	Host      *string
+	Port      *uint
+	User      *string
+	Password  *string
 
 	Deleted *bool
 

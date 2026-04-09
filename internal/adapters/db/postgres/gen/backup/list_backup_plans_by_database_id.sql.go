@@ -7,26 +7,29 @@ package backupq
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const listBackupPlansByDatabaseID = `-- name: ListBackupPlansByDatabaseID :many
-SELECT id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
+SELECT id, public_id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
 FROM backup_plans
 WHERE database_id = $1
 ORDER BY created_at DESC
 `
 
 type ListBackupPlansByDatabaseIDRow struct {
-	ID                 string `json:"id"`
-	DatabaseID         string `json:"database_id"`
-	Schedule           string `json:"schedule"`
-	Enabled            bool   `json:"enabled"`
-	RetentionPolicy    string `json:"retention_policy"`
-	CompressionEnabled bool   `json:"compression_enabled"`
-	EncryptionEnabled  bool   `json:"encryption_enabled"`
+	ID                 string      `json:"id"`
+	PublicID           pgtype.UUID `json:"public_id"`
+	DatabaseID         int64       `json:"database_id"`
+	Schedule           string      `json:"schedule"`
+	Enabled            bool        `json:"enabled"`
+	RetentionPolicy    string      `json:"retention_policy"`
+	CompressionEnabled bool        `json:"compression_enabled"`
+	EncryptionEnabled  bool        `json:"encryption_enabled"`
 }
 
-func (q *Queries) ListBackupPlansByDatabaseID(ctx context.Context, databaseID string) ([]ListBackupPlansByDatabaseIDRow, error) {
+func (q *Queries) ListBackupPlansByDatabaseID(ctx context.Context, databaseID int64) ([]ListBackupPlansByDatabaseIDRow, error) {
 	rows, err := q.db.Query(ctx, listBackupPlansByDatabaseID, databaseID)
 	if err != nil {
 		return nil, err
@@ -37,6 +40,7 @@ func (q *Queries) ListBackupPlansByDatabaseID(ctx context.Context, databaseID st
 		var i ListBackupPlansByDatabaseIDRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.PublicID,
 			&i.DatabaseID,
 			&i.Schedule,
 			&i.Enabled,

@@ -12,14 +12,15 @@ import (
 )
 
 const findBackupJobByID = `-- name: FindBackupJobByID :one
-SELECT id, database_id, trigger_type, status, started_at, finished_at, artifact_id
+SELECT id, public_id, database_id, trigger_type, status, started_at, finished_at, artifact_id
 FROM backup_jobs
 WHERE id = $1
 `
 
 type FindBackupJobByIDRow struct {
 	ID          string             `json:"id"`
-	DatabaseID  string             `json:"database_id"`
+	PublicID    pgtype.UUID        `json:"public_id"`
+	DatabaseID  int64              `json:"database_id"`
 	TriggerType string             `json:"trigger_type"`
 	Status      string             `json:"status"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
@@ -32,6 +33,7 @@ func (q *Queries) FindBackupJobByID(ctx context.Context, id string) (FindBackupJ
 	var i FindBackupJobByIDRow
 	err := row.Scan(
 		&i.ID,
+		&i.PublicID,
 		&i.DatabaseID,
 		&i.TriggerType,
 		&i.Status,

@@ -3,6 +3,7 @@ package postgres_database
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,19 +11,23 @@ import (
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/database"
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/shared"
 	outbound_ports "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/ports/outbound"
+	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type databaseRepositoryImpl struct {
-	q *databaseq.Queries
+	q    *databaseq.Queries
+	pool *pgxpool.Pool
 }
 
 func NewDatabaseRepository(
 	pool *pgxpool.Pool,
 ) outbound_ports.DatabaseRepository {
 	return &databaseRepositoryImpl{
-		q: databaseq.New(pool),
+		q:    databaseq.New(pool),
+		pool: pool,
 	}
 }
 
@@ -52,17 +57,20 @@ func (r *databaseRepositoryImpl) Save(
 		Port:      int32(db.Port),
 		Username:  db.User,
 		Password:  db.Password,
-		CreatedAt: db.CreatedAt,
-		UpdatedAt: db.UpdatedAt,
-		DeletedAt: db.DeletedAt,
+		CreatedAt: toPGTimestamp(db.CreatedAt),
+		UpdatedAt: toPGTimestamp(db.UpdatedAt),
+		DeletedAt: toPGTimestampPointer(db.DeletedAt),
 	})
 	return err
 }
 
 func (r *databaseRepositoryImpl) FindByID(ctx context.Context, id string) (*database.Database, error) {
-	row := r.pool.QueryRow(ctx, databaseFindByIDSQL, id)
+	parsedID, err := parseID(id)
+	if err != nil {
+		return nil, err
+	}
 
-	item, err := scanDatabase(row)
+	row, err := r.q.FindDatabaseByID(ctx, parsedID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -70,7 +78,7 @@ func (r *databaseRepositoryImpl) FindByID(ctx context.Context, id string) (*data
 		return nil, err
 	}
 
-	return item, nil
+	return mapQueryRowToDomain(row), nil
 }
 
 func (r *databaseRepositoryImpl) Filter(
@@ -90,7 +98,15 @@ func (r *databaseRepositoryImpl) Filter(
 
 	if f != nil {
 		if len(f.IDs) > 0 {
-			addClause("id = ANY($%d)", f.IDs)
+			parsedIDs := make([]int64, 0, len(f.IDs))
+			for _, id := range f.IDs {
+				parsedID, parseErr := parseID(id)
+				if parseErr != nil {
+					return nil, parseErr
+				}
+				parsedIDs = append(parsedIDs, parsedID)
+			}
+			addClause("id = ANY($%d)", parsedIDs)
 		}
 		if f.Title != nil {
 			addClause("title ILIKE ('%%' || $%d || '%%')", *f.Title)
@@ -203,18 +219,83 @@ func (r *databaseRepositoryImpl) Filter(
 }
 
 func (r *databaseRepositoryImpl) SoftDelete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, databaseSoftDeleteSQL, id)
-	return err
+	parsedID, err := parseID(id)
+	if err != nil {
+		return err
+	}
+	return r.q.SoftDeleteDatabase(ctx, parsedID)
 }
 
 func (r *databaseRepositoryImpl) Restore(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, databaseRestoreSQL, id)
-	return err
+	parsedID, err := parseID(id)
+	if err != nil {
+		return err
+	}
+	return r.q.RestoreDatabase(ctx, parsedID)
 }
 
 func (r *databaseRepositoryImpl) HardDelete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, databaseHardDeleteSQL, id)
-	return err
+	parsedID, err := parseID(id)
+	if err != nil {
+		return err
+	}
+	return r.q.HardDeleteDatabase(ctx, parsedID)
+}
+
+func mapQueryRowToDomain(row databaseq.FindDatabaseByIDRow) *database.Database {
+	item := &database.Database{
+		ID:       zhinuxtypes.ID(row.ID),
+		Title:    row.Title,
+		Typ:      database.DatabaseType(row.Type),
+		Host:     row.Host,
+		Port:     uint(row.Port),
+		User:     row.Username,
+		Password: row.Password,
+	}
+
+	if row.CreatedAt.Valid {
+		item.CreatedAt = row.CreatedAt.Time
+	}
+	if row.UpdatedAt.Valid {
+		item.UpdatedAt = row.UpdatedAt.Time
+	}
+	if row.DeletedAt.Valid {
+		deletedAt := row.DeletedAt.Time
+		item.DeletedAt = &deletedAt
+	}
+
+	return item
+}
+
+func parseID(rawID string) (int64, error) {
+	id := strings.TrimSpace(rawID)
+	if id == "" {
+		return 0, fmt.Errorf("id is required")
+	}
+
+	parsedID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse id %q: %w", rawID, err)
+	}
+
+	return parsedID, nil
+}
+
+func toPGTimestamp(value time.Time) pgtype.Timestamptz {
+	if value.IsZero() {
+		return pgtype.Timestamptz{}
+	}
+	return pgtype.Timestamptz{
+		Time:  value.UTC(),
+		Valid: true,
+	}
+}
+
+func toPGTimestampPointer(value *time.Time) pgtype.Timestamptz {
+	if value == nil {
+		return pgtype.Timestamptz{}
+	}
+	return toPGTimestamp(*value)
 }
 
 func scanDatabase(row interface {
@@ -242,43 +323,3 @@ func scanDatabase(row interface {
 	item.Typ = database.DatabaseType(typ)
 	return &item, nil
 }
-
-// const (
-// 	databaseUpsertSQL = `
-// INSERT INTO databases (
-// 	id, title, type, host, port, username, password, created_at, updated_at, deleted_at
-// ) VALUES (
-// 	$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-// ) ON CONFLICT (id) DO UPDATE SET
-// 	title = EXCLUDED.title,
-// 	type = EXCLUDED.type,
-// 	host = EXCLUDED.host,
-// 	port = EXCLUDED.port,
-// 	username = EXCLUDED.username,
-// 	password = EXCLUDED.password,
-// 	updated_at = EXCLUDED.updated_at,
-// 	deleted_at = EXCLUDED.deleted_at
-// `
-
-// 	databaseFindByIDSQL = `
-// SELECT id, title, type, host, port, username, password, created_at, updated_at, deleted_at
-// FROM databases
-// WHERE id = $1
-// `
-
-// 	databaseSoftDeleteSQL = `
-// UPDATE databases
-// SET deleted_at = NOW(), updated_at = NOW()
-// WHERE id = $1
-// `
-
-// 	databaseRestoreSQL = `
-// UPDATE databases
-// SET deleted_at = NULL, updated_at = NOW()
-// WHERE id = $1
-// `
-
-// 	databaseHardDeleteSQL = `
-// DELETE FROM databases WHERE id = $1
-// `
-// )
