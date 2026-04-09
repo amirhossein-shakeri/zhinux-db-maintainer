@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS databases (
-    id TEXT PRIMARY KEY,
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    -- public_id UUID UNIQUE DEFAULT gen_random_uuid_v7 (),
     title TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('postgres', 'mongo')),
     host TEXT NOT NULL,
@@ -12,5 +13,7 @@ CREATE TABLE IF NOT EXISTS databases (
 );
 
 CREATE INDEX IF NOT EXISTS idx_databases_type ON databases (type);
+
 CREATE INDEX IF NOT EXISTS idx_databases_host_port ON databases (host, port);
+
 CREATE INDEX IF NOT EXISTS idx_databases_deleted_at ON databases (deleted_at);

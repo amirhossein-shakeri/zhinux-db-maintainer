@@ -1,9 +1,15 @@
 package database
 
-import "time"
+import (
+	"time"
+
+	"github.com/amirhossein-shakeri/zhinux-platform/types"
+)
 
 type Database struct {
-	ID    string
+	ID types.ID // Internal ID(Fast joins)
+	// PublicID string   // Exposed UUID at public APIs(Safe public identifiers)
+
 	Title string
 	Typ   DatabaseType
 
