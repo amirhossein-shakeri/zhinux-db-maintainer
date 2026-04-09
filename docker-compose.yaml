@@ -1,0 +1,31 @@
+services:
+  redis:
+    image: redis:latest # redis:7.2
+    container_name: zhinux-db-maintainer-redis
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:6379:6379"
+
+    volumes:
+      # Redis configuration
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+
+      # Persistent data
+      - ./redis-data:/data
+
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    sysctls:
+      net.core.somaxconn: 1024
+
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
