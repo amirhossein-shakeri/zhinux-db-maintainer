@@ -1,0 +1,8 @@
+{
+  "host": "localhost",
+  "port": 5432,
+  "username": "postgres",
+  "password": "postgrespw",
+  // "database": "material-pricing",
+  "databases": ["material-pricing", "material-pricing-dev"],
+}

@@ -1,12 +1,42 @@
 # Minimal Backup App
 
-This app creates a PostgreSQL backup by streaming plain SQL from `pg_dump` directly into `zstd`.
+A maintainable, modular CLI that streams PostgreSQL plain SQL dumps into `zstd`.
 
-Pipeline:
+Pipeline per DB:
 
 `pg_dump --format=plain | zstd -<level> -T... -o <file.sql.zst>`
 
-This avoids loading the dump into memory and is suitable for large databases.
+This keeps memory usage low for large databases because data is streamed through pipes.
+
+## Features
+
+- Single quick-run mode from CLI args (`-db ...`).
+- Multi-source mode from `cmd/minimal/db-sources/*.json`.
+- Fallback `pg_dump` binary detection (first match by priority).
+- Sync/async execution with configurable concurrency.
+- Non-fail-fast behavior: continue and aggregate per-db errors.
+- Per-database report files next to backup output (enabled by default).
+- Aggregate run report in output directory (enabled by default).
+
+## Source modes
+
+- `-source-mode auto` (default):
+  - Uses single mode when `-db` is set.
+  - Uses file mode when `-db` is empty.
+- `-source-mode single`: uses CLI database connection flags.
+- `-source-mode files`: parses `-source-files` (glob or CSV list).
+
+`jsonc` is currently not supported; use `.json` files.
+
+## Supported source JSON shapes
+
+Array/object with per-entry fields:
+
+- `host`, `port`, `username`, `password`
+- `database` (single DB)
+- `databases` (multiple DBs)
+- `disabled` (skip entry)
+- `reportDisabled` (disable per-db report for that entry)
 
 ## Build
 
@@ -14,37 +44,11 @@ This avoids loading the dump into memory and is suitable for large databases.
 go build ./cmd/minimal
 ```
 
-## Usage
+## Single DB quick run
 
 ```bash
 go run ./cmd/minimal \
-  -host localhost \
-  -port 5432 \
-  -username postgres \
-  -password postgres \
-  -db mydb
-```
-
-## Flags
-
-- `-host` (required): PostgreSQL host.
-- `-port` (default `5432`): PostgreSQL port.
-- `-username` (required): PostgreSQL user.
-- `-password`: PostgreSQL password (sets `PGPASSWORD` for `pg_dump`).
-- `-db` (required): Database name.
-- `-out-dir` (default `backups`): Output directory.
-- `-out-name`: Output file name. If omitted, auto-generated as:
-  - `<db>_<host>_<UTC timestamp>.sql.zst`
-- `-pg-dump-bin` (default `pg_dump`): Path to `pg_dump`.
-- `-zstd-bin` (default `zstd`): Path to `zstd`.
-- `-zstd-level` (default `19`, range `1..22`): zstd compression level.
-- `-zstd-all-cpus` (default `true`): Use `-T0` in zstd.
-- `-zstd-threads` (default `0`): Used only when `-zstd-all-cpus=false`; must be `>=1`.
-
-## Example equivalent to your shell command
-
-```bash
-go run ./cmd/minimal \
+  -source-mode single \
   -host localhost \
   -port 5432 \
   -username postgres \
@@ -56,8 +60,64 @@ go run ./cmd/minimal \
   -zstd-all-cpus=true
 ```
 
-## Resource behavior
+## Multi DB from sources
 
-- Data is streamed from `pg_dump` to `zstd` via OS pipes.
-- No full dump buffering in app memory.
-- Compression CPU usage is controlled by `-zstd-all-cpus` / `-zstd-threads`.
+```bash
+go run ./cmd/minimal \
+  -source-mode files \
+  -source-files "cmd/minimal/db-sources/*.json" \
+  -process-mode async \
+  -concurrency 4
+```
+
+## Key flags
+
+- Connection defaults:
+  - `-host=localhost`
+  - `-port=5432`
+  - `-username=postgres`
+- Compression:
+  - `-zstd-level` (`1..22`, default `19`)
+  - `-zstd-all-cpus` (default `true`)
+  - `-zstd-threads` (used when all-cpus is false)
+- Processing:
+  - `-process-mode=sync|async`
+  - `-concurrency` (for async mode)
+- Reports:
+  - `-report-db` (default `true`)
+  - `-report-run` (default `true`)
+  - `-report-ext` (default `.report.json`)
+  - `-profile-summary` (default `true`)
+
+## pg_dump fallback priority
+
+When `-pg-dump-bin` is empty, first available path is used:
+
+1. `pg_dump` from `PATH`
+2. `/opt/homebrew/opt/postgresql@18/bin/pg_dump`
+3. `/opt/homebrew/opt/postgresql@17/bin/pg_dump`
+4. `/opt/homebrew/opt/postgresql@16/bin/pg_dump`
+5. `/opt/homebrew/bin/pg_dump`
+6. `/usr/local/bin/pg_dump`
+7. `/usr/bin/pg_dump`
+
+## Reports
+
+Per-db report (next to backup):
+
+`<backup-file>.report.json` (configurable ext)
+
+Includes:
+
+- uncompressed/compressed size
+- compression ratio and percent saved
+- dump time, compression time, total time
+- stderr and error details
+- optional runtime profile summary
+
+Run report (`out-dir`):
+
+- total/succeeded/failed
+- total size and overall compression stats
+- end-to-end duration and run config
+- all per-db result entries
