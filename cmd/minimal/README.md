@@ -6,7 +6,8 @@ Pipeline per DB:
 
 `pg_dump --format=plain | zstd -<level> -T... -o <file.sql.zst>`
 
-This keeps memory usage low for large databases because data is streamed through pipes.
+Compressed mode keeps memory usage low for large databases because data is streamed through pipes.
+Non-compressed mode writes plain SQL directly from `pg_dump --file`.
 
 ## Features
 
@@ -26,7 +27,7 @@ This keeps memory usage low for large databases because data is streamed through
 - `-source-mode single`: uses CLI database connection flags.
 - `-source-mode files`: parses `-source-files` (glob or CSV list).
 
-`jsonc` is currently not supported; use `.json` files.
+`.json` and `.jsonc` are supported.
 
 ## Supported source JSON shapes
 
@@ -37,6 +38,7 @@ Array/object with per-entry fields:
 - `databases` (multiple DBs)
 - `disabled` (skip entry)
 - `reportDisabled` (disable per-db report for that entry)
+- `compress` (optional bool, defaults `true`; if `false`, writes plain `.sql`)
 
 ## Build
 
@@ -80,6 +82,9 @@ go run ./cmd/minimal \
   - `-zstd-level` (`1..22`, default `19`)
   - `-zstd-all-cpus` (default `true`)
   - `-zstd-threads` (used when all-cpus is false)
+  - Source-level `compress=false` skips zstd for that task.
+- Timestamp:
+  - `-jalali` uses Jalali timestamp in `Asia/Tehran` format like `1405-03-01--13-40-00-000`.
 - Processing:
   - `-process-mode=sync|async`
   - `-concurrency` (for async mode)
@@ -113,6 +118,7 @@ Per-db report (next to backup):
 Includes:
 
 - uncompressed/compressed size
+- human-readable sizes (`KiB/MiB/GiB...`)
 - compression ratio and percent saved
 - dump time, compression time, total time
 - stderr and error details
@@ -122,5 +128,6 @@ Run report (`out-dir`):
 
 - total/succeeded/failed
 - total size and overall compression stats
+- total dump duration and total compression duration
 - end-to-end duration and run config
 - all per-db result entries

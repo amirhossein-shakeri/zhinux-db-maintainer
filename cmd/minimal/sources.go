@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -26,6 +27,7 @@ type backupTask struct {
 	Username       string
 	Password       string
 	Database       string
+	Compress       bool
 	OutputName     string
 	DisableReport  bool
 	SourceFile     string
@@ -84,6 +86,7 @@ func singleTaskFromConfig(cfg config) backupTask {
 		Username:      defaultIfEmpty(cfg.Username, "postgres"),
 		Password:      cfg.Password,
 		Database:      strings.TrimSpace(cfg.Database),
+		Compress:      true,
 		OutputName:    strings.TrimSpace(cfg.OutputName),
 		DisableReport: !cfg.EnableDBReport,
 	}
@@ -141,7 +144,8 @@ func parseSourceFile(cfg config, path string) ([]backupTask, error) {
 
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".jsonc" {
-		return nil, fmt.Errorf("jsonc not supported for %s (fallback to json)", path)
+		raw = stripJSONCComments(raw)
+		logger.Debugf("jsonc comments stripped for file=%s", path)
 	}
 
 	trimmed := strings.TrimSpace(string(raw))
@@ -185,12 +189,17 @@ func expandEntries(cfg config, entries []sourceEntry, sourceFile string) []backu
 		database := strings.TrimSpace(anyToString(entry.Database))
 		if database != "" {
 			logger.Debugf("adding task file=%s index=%d db=%s host=%s port=%d user=%s", sourceFile, i, database, host, port, username)
+			compress := true
+			if entry.Compress != nil {
+				compress = *entry.Compress
+			}
 			tasks = append(tasks, backupTask{
 				Host:          host,
 				Port:          port,
 				Username:      username,
 				Password:      password,
 				Database:      database,
+				Compress:      compress,
 				DisableReport: disabledReport,
 				SourceFile:    sourceFile,
 				SourceIndex:   i,
@@ -203,12 +212,17 @@ func expandEntries(cfg config, entries []sourceEntry, sourceFile string) []backu
 				continue
 			}
 			logger.Debugf("adding task file=%s index=%d db=%s host=%s port=%d user=%s", sourceFile, i, dbName, host, port, username)
+			compress := true
+			if entry.Compress != nil {
+				compress = *entry.Compress
+			}
 			tasks = append(tasks, backupTask{
 				Host:          host,
 				Port:          port,
 				Username:      username,
 				Password:      password,
 				Database:      dbName,
+				Compress:      compress,
 				DisableReport: disabledReport,
 				SourceFile:    sourceFile,
 				SourceIndex:   i,
@@ -246,4 +260,13 @@ func positiveOrDefault(value, fallback int) int {
 		return value
 	}
 	return fallback
+}
+
+var jsoncLineCommentPattern = regexp.MustCompile(`(?m)//.*$`)
+var jsoncTrailingCommaPattern = regexp.MustCompile(`,(\s*[\]}])`)
+
+func stripJSONCComments(raw []byte) []byte {
+	stripped := jsoncLineCommentPattern.ReplaceAllString(string(raw), "")
+	stripped = jsoncTrailingCommaPattern.ReplaceAllString(stripped, "$1")
+	return []byte(stripped)
 }

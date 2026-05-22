@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -14,48 +15,56 @@ import (
 )
 
 type backupResult struct {
-	Task                   backupTask   `json:"task"`
-	OutputPath             string       `json:"outputPath"`
-	StartedAt              time.Time    `json:"startedAt"`
-	EndedAt                time.Time    `json:"endedAt"`
-	DumpDuration           durationJSON `json:"dumpDuration"`
-	CompressionDuration    durationJSON `json:"compressionDuration"`
-	TotalDuration          durationJSON `json:"totalDuration"`
-	UncompressedBytes      int64        `json:"uncompressedBytes"`
-	CompressedBytes        int64        `json:"compressedBytes"`
-	CompressionRatio       float64      `json:"compressionRatio"`
-	CompressionPercent     float64      `json:"compressionPercent"`
-	PgDumpBin              string       `json:"pgDumpBin"`
-	ZstdBin                string       `json:"zstdBin"`
-	ZstdArgs               []string     `json:"zstdArgs"`
-	PgDumpArgs             []string     `json:"pgDumpArgs"`
-	Success                bool         `json:"success"`
-	Error                  string       `json:"error,omitempty"`
-	PgDumpStderr           string       `json:"pgDumpStderr,omitempty"`
-	ZstdStderr             string       `json:"zstdStderr,omitempty"`
-	ReportPath             string       `json:"reportPath,omitempty"`
-	Profile                *profileInfo `json:"profile,omitempty"`
+	Task                backupTask   `json:"task"`
+	OutputPath          string       `json:"outputPath"`
+	StartedAt           time.Time    `json:"startedAt"`
+	EndedAt             time.Time    `json:"endedAt"`
+	DumpDuration        durationJSON `json:"dumpDuration"`
+	CompressionDuration durationJSON `json:"compressionDuration"`
+	TotalDuration       durationJSON `json:"totalDuration"`
+	UncompressedBytes   int64        `json:"uncompressedBytes"`
+	CompressedBytes     int64        `json:"compressedBytes"`
+	UncompressedHuman   string       `json:"uncompressedHuman"`
+	CompressedHuman     string       `json:"compressedHuman"`
+	CompressionRatio    float64      `json:"compressionRatio"`
+	CompressionPercent  float64      `json:"compressionPercent"`
+	PgDumpBin           string       `json:"pgDumpBin"`
+	ZstdBin             string       `json:"zstdBin"`
+	ZstdArgs            []string     `json:"zstdArgs,omitempty"`
+	PgDumpArgs          []string     `json:"pgDumpArgs"`
+	CompressionEnabled  bool         `json:"compressionEnabled"`
+	ExecutionPath       string       `json:"executionPath"`
+	Success             bool         `json:"success"`
+	Error               string       `json:"error,omitempty"`
+	PgDumpStderr        string       `json:"pgDumpStderr,omitempty"`
+	ZstdStderr          string       `json:"zstdStderr,omitempty"`
+	ReportPath          string       `json:"reportPath,omitempty"`
+	Profile             *profileInfo `json:"profile,omitempty"`
 }
 
 type runSummary struct {
-	StartedAt         time.Time    `json:"startedAt"`
-	EndedAt           time.Time    `json:"endedAt"`
-	TotalDuration     durationJSON `json:"totalDuration"`
-	Total             int          `json:"total"`
-	Succeeded         int          `json:"succeeded"`
-	Failed            int          `json:"failed"`
-	TotalInputBytes   int64        `json:"totalInputBytes"`
-	TotalOutputBytes  int64        `json:"totalOutputBytes"`
-	OverallRatio      float64      `json:"overallRatio"`
-	OverallPercent    float64      `json:"overallPercent"`
-	ProcessMode       string       `json:"processMode"`
-	Concurrency       int          `json:"concurrency"`
-	PgDumpBin         string       `json:"pgDumpBin"`
-	ZstdBin           string       `json:"zstdBin"`
-	SourceMode        string       `json:"sourceMode"`
-	SourceFiles       string       `json:"sourceFiles"`
-	RunReportPath     string       `json:"runReportPath,omitempty"`
-	Profile           *profileInfo `json:"profile,omitempty"`
+	StartedAt                time.Time    `json:"startedAt"`
+	EndedAt                  time.Time    `json:"endedAt"`
+	TotalDuration            durationJSON `json:"totalDuration"`
+	TotalDumpDuration        durationJSON `json:"totalDumpDuration"`
+	TotalCompressionDuration durationJSON `json:"totalCompressionDuration"`
+	Total                    int          `json:"total"`
+	Succeeded                int          `json:"succeeded"`
+	Failed                   int          `json:"failed"`
+	TotalInputBytes          int64        `json:"totalInputBytes"`
+	TotalOutputBytes         int64        `json:"totalOutputBytes"`
+	TotalInputHuman          string       `json:"totalInputHuman"`
+	TotalOutputHuman         string       `json:"totalOutputHuman"`
+	OverallRatio             float64      `json:"overallRatio"`
+	OverallPercent           float64      `json:"overallPercent"`
+	ProcessMode              string       `json:"processMode"`
+	Concurrency              int          `json:"concurrency"`
+	PgDumpBin                string       `json:"pgDumpBin"`
+	ZstdBin                  string       `json:"zstdBin"`
+	SourceMode               string       `json:"sourceMode"`
+	SourceFiles              string       `json:"sourceFiles"`
+	RunReportPath            string       `json:"runReportPath,omitempty"`
+	Profile                  *profileInfo `json:"profile,omitempty"`
 }
 
 type profileInfo struct {
@@ -136,25 +145,101 @@ func runTasks(cfg config, tasks []backupTask) ([]backupResult, runSummary) {
 
 func runSingleTask(cfg config, task backupTask) backupResult {
 	startedAt := time.Now()
-	outputPath := buildOutputPath(cfg.OutputDir, task.OutputName, task.Host, task.Database, startedAt)
-	logger.Infof("starting backup task: db=%s host=%s port=%d user=%s out=%s", task.Database, task.Host, task.Port, task.Username, outputPath)
+	outputPath := buildOutputPath(cfg, task.OutputName, task.Host, task.Database, task.Compress, startedAt)
+	logger.Infof("starting backup task: db=%s host=%s port=%d user=%s out=%s compress=%t", task.Database, task.Host, task.Port, task.Username, outputPath, task.Compress)
 
 	result := backupResult{
-		Task:       task,
-		OutputPath: outputPath,
-		StartedAt:  startedAt,
-		PgDumpBin:  cfg.PgDumpBin,
-		ZstdBin:    cfg.ZstdBin,
-		Success:    false,
+		Task:               task,
+		OutputPath:         outputPath,
+		StartedAt:          startedAt,
+		PgDumpBin:          cfg.PgDumpBin,
+		ZstdBin:            cfg.ZstdBin,
+		CompressionEnabled: task.Compress,
+		Success:            false,
+	}
+	if err := ensureParentDir(result.OutputPath); err != nil {
+		result.Error = fmt.Sprintf("ensure output parent dir: %v", err)
+		result.EndedAt = time.Now()
+		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
+		return finalizeResult(cfg, result)
 	}
 	if strings.TrimSpace(task.PrecheckError) != "" {
 		result.Error = "source precheck failed: " + task.PrecheckError
 		logger.Warnf("skipping task due to precheck error: db=%s err=%s", task.Database, task.PrecheckError)
 		result.EndedAt = time.Now()
 		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
+		return finalizeResult(cfg, result)
+	}
+
+	if task.Compress {
+		result.ExecutionPath = "stream-pgdump-to-zstd"
+		result = runCompressedStreamingTask(cfg, task, result)
+	} else {
+		result.ExecutionPath = "direct-plain-pgdump-file"
+		result = runPlainTask(cfg, task, result)
+	}
+
+	result.EndedAt = time.Now()
+	result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
+	return finalizeResult(cfg, result)
+}
+
+func runPlainTask(cfg config, task backupTask, result backupResult) backupResult {
+	removeFileIfExists(result.OutputPath)
+	pgDumpArgs := []string{
+		"-h", task.Host,
+		"-p", fmt.Sprintf("%d", task.Port),
+		"-U", task.Username,
+		"-d", task.Database,
+		"--format=plain",
+		"--file", result.OutputPath,
+	}
+	result.PgDumpArgs = append([]string{}, pgDumpArgs...)
+	logger.Debugf("pg_dump args (plain path) db=%s: %v", task.Database, pgDumpArgs)
+
+	pgDumpCmd := exec.Command(cfg.PgDumpBin, pgDumpArgs...)
+	pgDumpCmd.Env = append(os.Environ(), "PGPASSWORD="+task.Password)
+	pgDumpStderr, err := pgDumpCmd.StderrPipe()
+	if err != nil {
+		result.Error = fmt.Sprintf("pg_dump stderr pipe: %v", err)
 		return result
 	}
 
+	dumpStart := time.Now()
+	if err := pgDumpCmd.Start(); err != nil {
+		result.Error = fmt.Sprintf("start pg_dump: %v", err)
+		logger.Errorf("pg_dump start failed (plain path): db=%s err=%v", task.Database, err)
+		return result
+	}
+	logger.Debugf("waiting for pg_dump completion (plain path): db=%s", task.Database)
+	pgDumpWaitErr := pgDumpCmd.Wait()
+	dumpEnd := time.Now()
+	result.DumpDuration = durationJSON(dumpEnd.Sub(dumpStart))
+	result.PgDumpStderr = strings.TrimSpace(<-readPipeText(pgDumpStderr))
+
+	if pgDumpWaitErr != nil {
+		result.Error = mergeError(result.Error, fmt.Sprintf("pg_dump failed: %v", pgDumpWaitErr))
+		_ = os.Remove(result.OutputPath)
+		logger.Warnf("plain backup failed, output removed: db=%s path=%s err=%s", task.Database, result.OutputPath, result.Error)
+		return result
+	}
+
+	stat, statErr := os.Stat(result.OutputPath)
+	if statErr != nil {
+		result.Error = mergeError(result.Error, fmt.Sprintf("stat output file: %v", statErr))
+		return result
+	}
+
+	result.UncompressedBytes = stat.Size()
+	result.CompressedBytes = result.UncompressedBytes
+	result.Success = true
+	logger.Infof("plain backup succeeded: db=%s path=%s", task.Database, result.OutputPath)
+	return result
+}
+
+func runCompressedStreamingTask(cfg config, task backupTask, result backupResult) backupResult {
+	finalTempOutput := result.OutputPath + ".part"
+	removeFileIfExists(finalTempOutput)
 	pgDumpArgs := []string{
 		"-h", task.Host,
 		"-p", fmt.Sprintf("%d", task.Port),
@@ -163,7 +248,7 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 		"--format=plain",
 	}
 	result.PgDumpArgs = append([]string{}, pgDumpArgs...)
-	logger.Debugf("pg_dump args db=%s: %v", task.Database, pgDumpArgs)
+	logger.Debugf("pg_dump args (stream path) db=%s: %v", task.Database, pgDumpArgs)
 
 	zstdArgs := []string{fmt.Sprintf("-%d", cfg.ZstdLevel)}
 	if cfg.UseAllCPUs {
@@ -171,47 +256,37 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 	} else {
 		zstdArgs = append(zstdArgs, "-T", fmt.Sprintf("%d", cfg.ZstdThreadCount))
 	}
-	zstdArgs = append(zstdArgs, "-o", outputPath)
+	zstdArgs = append(zstdArgs, "-o", finalTempOutput)
 	result.ZstdArgs = append([]string{}, zstdArgs...)
-	logger.Debugf("zstd args db=%s: %v", task.Database, zstdArgs)
+	logger.Debugf("zstd args (stream path) db=%s: %v", task.Database, zstdArgs)
 
 	pgDumpCmd := exec.Command(cfg.PgDumpBin, pgDumpArgs...)
 	pgDumpCmd.Env = append(os.Environ(), "PGPASSWORD="+task.Password)
-
 	zstdCmd := exec.Command(cfg.ZstdBin, zstdArgs...)
 
 	pgDumpStdout, err := pgDumpCmd.StdoutPipe()
 	if err != nil {
 		result.Error = fmt.Sprintf("pg_dump stdout pipe: %v", err)
-		result.EndedAt = time.Now()
-		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
 		return result
 	}
 	pgDumpStderr, err := pgDumpCmd.StderrPipe()
 	if err != nil {
 		result.Error = fmt.Sprintf("pg_dump stderr pipe: %v", err)
-		result.EndedAt = time.Now()
-		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
 		return result
 	}
 	zstdStderr, err := zstdCmd.StderrPipe()
 	if err != nil {
 		result.Error = fmt.Sprintf("zstd stderr pipe: %v", err)
-		result.EndedAt = time.Now()
-		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
 		return result
 	}
 
 	countWriter := &countingWriter{}
 	pipeReader, pipeWriter := io.Pipe()
-
 	zstdCmd.Stdin = pipeReader
 
 	if err := pgDumpCmd.Start(); err != nil {
 		result.Error = fmt.Sprintf("start pg_dump: %v", err)
-		logger.Errorf("pg_dump start failed: db=%s err=%v", task.Database, err)
-		result.EndedAt = time.Now()
-		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
+		logger.Errorf("pg_dump start failed (stream path): db=%s err=%v", task.Database, err)
 		_ = pipeReader.Close()
 		_ = pipeWriter.Close()
 		return result
@@ -220,9 +295,7 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 		_ = pgDumpCmd.Process.Kill()
 		_ = pgDumpCmd.Wait()
 		result.Error = fmt.Sprintf("start zstd: %v", err)
-		logger.Errorf("zstd start failed: db=%s err=%v", task.Database, err)
-		result.EndedAt = time.Now()
-		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
+		logger.Errorf("zstd start failed (stream path): db=%s err=%v", task.Database, err)
 		_ = pipeReader.Close()
 		_ = pipeWriter.Close()
 		return result
@@ -239,41 +312,29 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 		close(copyDone)
 	}()
 
-	pgDumpErrCh := make(chan string, 1)
-	zstdErrCh := make(chan string, 1)
-	go copyPipeOutput(pgDumpStderr, pgDumpErrCh)
-	go copyPipeOutput(zstdStderr, zstdErrCh)
+	pgDumpErrCh := readPipeText(pgDumpStderr)
+	zstdErrCh := readPipeText(zstdStderr)
 
 	dumpStart := time.Now()
-	logger.Debugf("waiting for pg_dump completion: db=%s", task.Database)
+	logger.Debugf("waiting for pg_dump completion (stream path): db=%s", task.Database)
 	pgDumpWaitErr := pgDumpCmd.Wait()
 	dumpEnd := time.Now()
 	result.DumpDuration = durationJSON(dumpEnd.Sub(dumpStart))
-	logger.Infof("pg_dump completed: db=%s duration=%s err=%v", task.Database, time.Duration(result.DumpDuration), pgDumpWaitErr)
+	result.PgDumpStderr = strings.TrimSpace(<-pgDumpErrCh)
+	logger.Infof("pg_dump completed (stream path): db=%s duration=%s err=%v", task.Database, time.Duration(result.DumpDuration), pgDumpWaitErr)
 
 	<-copyDone
 	_ = pipeReader.Close()
 
 	compStart := dumpEnd
-	logger.Debugf("waiting for zstd completion: db=%s", task.Database)
+	logger.Debugf("waiting for zstd completion (stream path): db=%s", task.Database)
 	zstdWaitErr := zstdCmd.Wait()
 	compEnd := time.Now()
 	result.CompressionDuration = durationJSON(compEnd.Sub(compStart))
-	logger.Infof("zstd completed: db=%s duration=%s err=%v", task.Database, time.Duration(result.CompressionDuration), zstdWaitErr)
-
-	pgDumpErrText := <-pgDumpErrCh
-	zstdErrText := <-zstdErrCh
-	result.PgDumpStderr = strings.TrimSpace(pgDumpErrText)
-	result.ZstdStderr = strings.TrimSpace(zstdErrText)
+	result.ZstdStderr = strings.TrimSpace(<-zstdErrCh)
+	logger.Infof("zstd completed (stream path): db=%s duration=%s err=%v", task.Database, time.Duration(result.CompressionDuration), zstdWaitErr)
 
 	result.UncompressedBytes = countWriter.count
-	if stat, statErr := os.Stat(outputPath); statErr == nil {
-		result.CompressedBytes = stat.Size()
-	}
-	computeRatios(&result)
-	logger.Infof("size stats: db=%s input=%d output=%d ratio=%.4f saved=%.2f%%",
-		task.Database, result.UncompressedBytes, result.CompressedBytes, result.CompressionRatio, result.CompressionPercent)
-
 	if errAny := copyErr.Load(); errAny != nil {
 		result.Error = mergeError(result.Error, fmt.Sprintf("stream copy: %v", errAny))
 	}
@@ -284,21 +345,47 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 		result.Error = mergeError(result.Error, fmt.Sprintf("zstd failed: %v", zstdWaitErr))
 	}
 
-	if result.Error == "" {
-		result.Success = true
-		logger.Infof("backup task succeeded: db=%s", task.Database)
-	} else {
-		logger.Warnf("backup task failed: db=%s err=%s", task.Database, result.Error)
+	if result.Error != "" {
+		_ = os.Remove(finalTempOutput)
+		logger.Warnf("compressed backup failed, partial archive removed: db=%s path=%s err=%s", task.Database, finalTempOutput, result.Error)
+		return result
 	}
 
-	result.EndedAt = time.Now()
-	result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
+	if stat, statErr := os.Stat(finalTempOutput); statErr == nil {
+		result.CompressedBytes = stat.Size()
+	} else {
+		result.Error = mergeError(result.Error, fmt.Sprintf("stat compressed output: %v", statErr))
+		_ = os.Remove(finalTempOutput)
+		return result
+	}
+
+	if err := os.Rename(finalTempOutput, result.OutputPath); err != nil {
+		result.Error = mergeError(result.Error, fmt.Sprintf("promote archive: %v", err))
+		_ = os.Remove(finalTempOutput)
+		return result
+	}
+
+	result.Success = true
+	logger.Infof("compressed backup succeeded: db=%s path=%s", task.Database, result.OutputPath)
+	return result
+}
+
+func finalizeResult(cfg config, result backupResult) backupResult {
+	computeRatios(&result)
+	result.UncompressedHuman = formatBytesIEC(result.UncompressedBytes)
+	result.CompressedHuman = formatBytesIEC(result.CompressedBytes)
 	if cfg.ProfileSummary {
 		result.Profile = &profileInfo{Goroutines: runtime.NumGoroutine(), ConcurrencyUsed: 1}
-		logger.Debugf("profile summary captured: db=%s goroutines=%d", task.Database, result.Profile.Goroutines)
+		logger.Debugf("profile summary captured: db=%s goroutines=%d", result.Task.Database, result.Profile.Goroutines)
 	}
-
-	logger.Infof("backup task completed: db=%s total-duration=%s", task.Database, time.Duration(result.TotalDuration))
+	logger.Infof("size stats: db=%s input=%s(%d) output=%s(%d) ratio=%.4f saved=%.2f%%",
+		result.Task.Database,
+		result.UncompressedHuman, result.UncompressedBytes,
+		result.CompressedHuman, result.CompressedBytes,
+		result.CompressionRatio,
+		result.CompressionPercent,
+	)
+	logger.Infof("backup task completed: db=%s total-duration=%s path=%s", result.Task.Database, time.Duration(result.TotalDuration), result.ExecutionPath)
 	return result
 }
 
@@ -313,14 +400,18 @@ func computeRatios(result *backupResult) {
 	result.CompressionPercent = (1 - ratio) * 100
 }
 
-func copyPipeOutput(reader io.Reader, out chan<- string) {
-	defer close(out)
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		out <- fmt.Sprintf("read stderr error: %v", err)
-		return
-	}
-	out <- string(data)
+func readPipeText(reader io.Reader) <-chan string {
+	out := make(chan string, 1)
+	go func() {
+		defer close(out)
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			out <- fmt.Sprintf("read stderr error: %v", err)
+			return
+		}
+		out <- string(data)
+	}()
+	return out
 }
 
 func mergeError(current, next string) string {
@@ -355,6 +446,8 @@ func aggregateSummary(cfg config, startedAt, endedAt time.Time, results []backup
 		}
 		summary.TotalInputBytes += result.UncompressedBytes
 		summary.TotalOutputBytes += result.CompressedBytes
+		summary.TotalDumpDuration += result.DumpDuration
+		summary.TotalCompressionDuration += result.CompressionDuration
 	}
 	logger.Debugf("aggregate bytes: input=%d output=%d", summary.TotalInputBytes, summary.TotalOutputBytes)
 
@@ -363,6 +456,8 @@ func aggregateSummary(cfg config, startedAt, endedAt time.Time, results []backup
 		summary.OverallRatio = ratio
 		summary.OverallPercent = (1 - ratio) * 100
 	}
+	summary.TotalInputHuman = formatBytesIEC(summary.TotalInputBytes)
+	summary.TotalOutputHuman = formatBytesIEC(summary.TotalOutputBytes)
 	if cfg.ProfileSummary {
 		summary.Profile = &profileInfo{Goroutines: runtime.NumGoroutine(), ConcurrencyUsed: concurrencyUsed}
 	}
@@ -372,8 +467,53 @@ func aggregateSummary(cfg config, startedAt, endedAt time.Time, results []backup
 
 func printRunSummary(summary runSummary) {
 	fmt.Printf("run completed: total=%d succeeded=%d failed=%d duration=%s\n", summary.Total, summary.Succeeded, summary.Failed, time.Duration(summary.TotalDuration))
-	fmt.Printf("size totals: input=%d output=%d ratio=%.4f saved=%.2f%%\n", summary.TotalInputBytes, summary.TotalOutputBytes, summary.OverallRatio, summary.OverallPercent)
+	fmt.Printf("timings: total-dump=%s total-compression=%s\n", time.Duration(summary.TotalDumpDuration), time.Duration(summary.TotalCompressionDuration))
+	fmt.Printf("size totals: input=%s(%d) output=%s(%d) ratio=%.4f saved=%.2f%%\n",
+		summary.TotalInputHuman,
+		summary.TotalInputBytes,
+		summary.TotalOutputHuman,
+		summary.TotalOutputBytes,
+		summary.OverallRatio,
+		summary.OverallPercent,
+	)
 	if summary.RunReportPath != "" {
 		fmt.Printf("run report: %s\n", summary.RunReportPath)
 	}
+}
+
+func formatBytesIEC(bytes int64) string {
+	if bytes < 0 {
+		return "0 B"
+	}
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	prefixes := []string{"KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
+	return fmt.Sprintf("%.2f %s", float64(bytes)/float64(div), prefixes[exp])
+}
+
+func removeFileIfExists(path string) {
+	if strings.TrimSpace(path) == "" {
+		return
+	}
+	if _, err := os.Stat(path); err != nil {
+		return
+	}
+	if err := os.Remove(path); err != nil {
+		logger.Debugf("remove file skipped: path=%s err=%v", path, err)
+	}
+}
+
+func ensureParentDir(path string) error {
+	parent := filepath.Dir(path)
+	if parent == "." || parent == "" {
+		return nil
+	}
+	return os.MkdirAll(parent, 0o755)
 }

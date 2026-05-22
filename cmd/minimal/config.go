@@ -21,34 +21,36 @@ const (
 	defaultProcessMode  = "sync"
 	defaultSourcesGlob  = "db-sources/*"
 	defaultBackupSuffix = ".sql.zst"
+	plainBackupSuffix   = ".sql"
 )
 
 var filenameSanitizer = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
 type config struct {
-	Host             string
-	Port             int
-	Username         string
-	Password         string
-	Database         string
-	OutputDir        string
-	OutputName       string
-	PgDumpBin        string
-	ZstdBin          string
-	ZstdLevel        int
-	UseAllCPUs       bool
-	ZstdThreadCount  int
-	SourceMode       string
-	SourceFiles      string
-	ProcessMode      string
-	Concurrency      int
-	EnableDBReport   bool
-	EnableRunReport  bool
-	ReportExt        string
-	ProfileSummary   bool
-	Source           string
-	Verbose          bool
-	VerboseShort     bool
+	Host            string
+	Port            int
+	Username        string
+	Password        string
+	Database        string
+	OutputDir       string
+	OutputName      string
+	PgDumpBin       string
+	ZstdBin         string
+	ZstdLevel       int
+	UseAllCPUs      bool
+	ZstdThreadCount int
+	SourceMode      string
+	SourceFiles     string
+	ProcessMode     string
+	Concurrency     int
+	EnableDBReport  bool
+	EnableRunReport bool
+	ReportExt       string
+	ProfileSummary  bool
+	Source          string
+	Verbose         bool
+	VerboseShort    bool
+	JalaliTimestamp bool
 }
 
 func parseFlags() config {
@@ -77,6 +79,7 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.ProfileSummary, "profile-summary", true, "Include runtime profile summary in reports")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Enable verbose debug logs")
 	flag.BoolVar(&cfg.VerboseShort, "v", false, "Enable verbose debug logs (short)")
+	flag.BoolVar(&cfg.JalaliTimestamp, "jalali", false, "Use Jalali timestamp in Asia/Tehran for output names")
 
 	flag.Parse()
 	return cfg
@@ -240,11 +243,15 @@ func sanitizeForFilename(value string) string {
 	return sanitized
 }
 
-func buildOutputPath(outDir, outputName, host, database string, startedAt time.Time) string {
+func buildOutputPath(cfg config, outputName, host, database string, compress bool, startedAt time.Time) string {
 	if strings.TrimSpace(outputName) != "" {
-		return filepath.Join(outDir, outputName)
+		return filepath.Join(cfg.OutputDir, outputName)
 	}
-	timestamp := startedAt.UTC().Format("20060102T150405Z")
-	name := fmt.Sprintf("%s_%s_%s%s", sanitizeForFilename(database), sanitizeForFilename(host), timestamp, defaultBackupSuffix)
-	return filepath.Join(outDir, name)
+	timestamp := formatOutputTimestamp(cfg.JalaliTimestamp, startedAt)
+	suffix := plainBackupSuffix
+	if compress {
+		suffix = defaultBackupSuffix
+	}
+	name := fmt.Sprintf("%s_%s_%s%s", sanitizeForFilename(database), sanitizeForFilename(host), timestamp, suffix)
+	return filepath.Join(cfg.OutputDir, name)
 }
