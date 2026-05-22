@@ -74,6 +74,7 @@ func (writer *countingWriter) Write(p []byte) (int, error) {
 
 func runTasks(cfg config, tasks []backupTask) ([]backupResult, runSummary) {
 	startedAt := time.Now()
+	logger.Infof("starting task runner: tasks=%d process-mode=%s requested-concurrency=%d", len(tasks), cfg.ProcessMode, cfg.Concurrency)
 	results := make([]backupResult, len(tasks))
 
 	concurrency := cfg.Concurrency
@@ -86,43 +87,57 @@ func runTasks(cfg config, tasks []backupTask) ([]backupResult, runSummary) {
 	if concurrency < 1 {
 		concurrency = 1
 	}
+	logger.Infof("effective concurrency: %d", concurrency)
 
 	queue := make(chan int)
 	var wg sync.WaitGroup
 
 	for worker := 0; worker < concurrency; worker++ {
+		workerID := worker + 1
 		wg.Add(1)
-		go func() {
+		go func(id int) {
 			defer wg.Done()
+			logger.Infof("worker started: id=%d", id)
 			for idx := range queue {
+				logger.Infof("worker picked task: worker=%d task-index=%d db=%s", id, idx, tasks[idx].Database)
 				result := runSingleTask(cfg, tasks[idx])
 				if cfg.EnableDBReport && !tasks[idx].DisableReport {
 					reportPath, err := writeDBReport(cfg, result)
 					if err != nil {
 						result.Error = mergeError(result.Error, fmt.Sprintf("write db report: %v", err))
 						result.Success = false
+						logger.Warnf("db report write failed: worker=%d db=%s err=%v", id, tasks[idx].Database, err)
 					} else {
 						result.ReportPath = reportPath
+						logger.Infof("db report written: worker=%d db=%s path=%s", id, tasks[idx].Database, reportPath)
 					}
 				}
 				results[idx] = result
+				logger.Infof("worker finished task: worker=%d task-index=%d db=%s success=%t duration=%s",
+					id, idx, tasks[idx].Database, result.Success, time.Duration(result.TotalDuration))
 			}
-		}()
+			logger.Infof("worker stopped: id=%d", id)
+		}(workerID)
 	}
 
 	for i := range tasks {
+		logger.Debugf("queue task: index=%d db=%s host=%s", i, tasks[i].Database, tasks[i].Host)
 		queue <- i
 	}
 	close(queue)
+	logger.Debugf("task queue closed")
 	wg.Wait()
+	logger.Infof("all workers completed")
 
 	summary := aggregateSummary(cfg, startedAt, time.Now(), results, concurrency)
+	logger.Infof("summary aggregated: total=%d succeeded=%d failed=%d", summary.Total, summary.Succeeded, summary.Failed)
 	return results, summary
 }
 
 func runSingleTask(cfg config, task backupTask) backupResult {
 	startedAt := time.Now()
 	outputPath := buildOutputPath(cfg.OutputDir, task.OutputName, task.Host, task.Database, startedAt)
+	logger.Infof("starting backup task: db=%s host=%s port=%d user=%s out=%s", task.Database, task.Host, task.Port, task.Username, outputPath)
 
 	result := backupResult{
 		Task:       task,
@@ -134,6 +149,7 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 	}
 	if strings.TrimSpace(task.PrecheckError) != "" {
 		result.Error = "source precheck failed: " + task.PrecheckError
+		logger.Warnf("skipping task due to precheck error: db=%s err=%s", task.Database, task.PrecheckError)
 		result.EndedAt = time.Now()
 		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
 		return result
@@ -147,6 +163,7 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 		"--format=plain",
 	}
 	result.PgDumpArgs = append([]string{}, pgDumpArgs...)
+	logger.Debugf("pg_dump args db=%s: %v", task.Database, pgDumpArgs)
 
 	zstdArgs := []string{fmt.Sprintf("-%d", cfg.ZstdLevel)}
 	if cfg.UseAllCPUs {
@@ -156,6 +173,7 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 	}
 	zstdArgs = append(zstdArgs, "-o", outputPath)
 	result.ZstdArgs = append([]string{}, zstdArgs...)
+	logger.Debugf("zstd args db=%s: %v", task.Database, zstdArgs)
 
 	pgDumpCmd := exec.Command(cfg.PgDumpBin, pgDumpArgs...)
 	pgDumpCmd.Env = append(os.Environ(), "PGPASSWORD="+task.Password)
@@ -191,6 +209,7 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 
 	if err := pgDumpCmd.Start(); err != nil {
 		result.Error = fmt.Sprintf("start pg_dump: %v", err)
+		logger.Errorf("pg_dump start failed: db=%s err=%v", task.Database, err)
 		result.EndedAt = time.Now()
 		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
 		_ = pipeReader.Close()
@@ -201,6 +220,7 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 		_ = pgDumpCmd.Process.Kill()
 		_ = pgDumpCmd.Wait()
 		result.Error = fmt.Sprintf("start zstd: %v", err)
+		logger.Errorf("zstd start failed: db=%s err=%v", task.Database, err)
 		result.EndedAt = time.Now()
 		result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
 		_ = pipeReader.Close()
@@ -225,17 +245,21 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 	go copyPipeOutput(zstdStderr, zstdErrCh)
 
 	dumpStart := time.Now()
+	logger.Debugf("waiting for pg_dump completion: db=%s", task.Database)
 	pgDumpWaitErr := pgDumpCmd.Wait()
 	dumpEnd := time.Now()
 	result.DumpDuration = durationJSON(dumpEnd.Sub(dumpStart))
+	logger.Infof("pg_dump completed: db=%s duration=%s err=%v", task.Database, time.Duration(result.DumpDuration), pgDumpWaitErr)
 
 	<-copyDone
 	_ = pipeReader.Close()
 
 	compStart := dumpEnd
+	logger.Debugf("waiting for zstd completion: db=%s", task.Database)
 	zstdWaitErr := zstdCmd.Wait()
 	compEnd := time.Now()
 	result.CompressionDuration = durationJSON(compEnd.Sub(compStart))
+	logger.Infof("zstd completed: db=%s duration=%s err=%v", task.Database, time.Duration(result.CompressionDuration), zstdWaitErr)
 
 	pgDumpErrText := <-pgDumpErrCh
 	zstdErrText := <-zstdErrCh
@@ -247,6 +271,8 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 		result.CompressedBytes = stat.Size()
 	}
 	computeRatios(&result)
+	logger.Infof("size stats: db=%s input=%d output=%d ratio=%.4f saved=%.2f%%",
+		task.Database, result.UncompressedBytes, result.CompressedBytes, result.CompressionRatio, result.CompressionPercent)
 
 	if errAny := copyErr.Load(); errAny != nil {
 		result.Error = mergeError(result.Error, fmt.Sprintf("stream copy: %v", errAny))
@@ -260,14 +286,19 @@ func runSingleTask(cfg config, task backupTask) backupResult {
 
 	if result.Error == "" {
 		result.Success = true
+		logger.Infof("backup task succeeded: db=%s", task.Database)
+	} else {
+		logger.Warnf("backup task failed: db=%s err=%s", task.Database, result.Error)
 	}
 
 	result.EndedAt = time.Now()
 	result.TotalDuration = durationJSON(result.EndedAt.Sub(startedAt))
 	if cfg.ProfileSummary {
 		result.Profile = &profileInfo{Goroutines: runtime.NumGoroutine(), ConcurrencyUsed: 1}
+		logger.Debugf("profile summary captured: db=%s goroutines=%d", task.Database, result.Profile.Goroutines)
 	}
 
+	logger.Infof("backup task completed: db=%s total-duration=%s", task.Database, time.Duration(result.TotalDuration))
 	return result
 }
 
@@ -325,6 +356,7 @@ func aggregateSummary(cfg config, startedAt, endedAt time.Time, results []backup
 		summary.TotalInputBytes += result.UncompressedBytes
 		summary.TotalOutputBytes += result.CompressedBytes
 	}
+	logger.Debugf("aggregate bytes: input=%d output=%d", summary.TotalInputBytes, summary.TotalOutputBytes)
 
 	if summary.TotalInputBytes > 0 {
 		ratio := float64(summary.TotalOutputBytes) / float64(summary.TotalInputBytes)

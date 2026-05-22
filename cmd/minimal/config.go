@@ -47,6 +47,8 @@ type config struct {
 	ReportExt        string
 	ProfileSummary   bool
 	Source           string
+	Verbose          bool
+	VerboseShort     bool
 }
 
 func parseFlags() config {
@@ -73,6 +75,8 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.EnableRunReport, "report-run", true, "Write aggregate run report in output directory")
 	flag.StringVar(&cfg.ReportExt, "report-ext", defaultReportExt, "Report file extension")
 	flag.BoolVar(&cfg.ProfileSummary, "profile-summary", true, "Include runtime profile summary in reports")
+	flag.BoolVar(&cfg.Verbose, "verbose", false, "Enable verbose debug logs")
+	flag.BoolVar(&cfg.VerboseShort, "v", false, "Enable verbose debug logs (short)")
 
 	flag.Parse()
 	return cfg
@@ -108,25 +112,37 @@ func (cfg config) validate() error {
 }
 
 func (cfg *config) prepare() error {
+	if cfg.VerboseShort {
+		cfg.Verbose = true
+	}
+	logger.setVerbose(cfg.Verbose)
+	logger.Infof("preparing configuration")
+	logger.Debugf("raw config: host=%s port=%d username=%s db=%s source-mode=%s process-mode=%s concurrency=%d out-dir=%s",
+		cfg.Host, cfg.Port, cfg.Username, cfg.Database, cfg.SourceMode, cfg.ProcessMode, cfg.Concurrency, cfg.OutputDir)
+
 	if err := os.MkdirAll(cfg.OutputDir, 0o755); err != nil {
 		return fmt.Errorf("create output directory: %w", err)
 	}
+	logger.Infof("ensured output directory exists: %s", cfg.OutputDir)
 
 	pgDumpPath, err := resolvePgDumpPath(cfg.PgDumpBin)
 	if err != nil {
 		return err
 	}
 	cfg.PgDumpBin = pgDumpPath
+	logger.Infof("resolved pg_dump binary: %s", cfg.PgDumpBin)
 
 	zstdPath, err := exec.LookPath(cfg.ZstdBin)
 	if err != nil {
 		return fmt.Errorf("resolve zstd binary %q: %w", cfg.ZstdBin, err)
 	}
 	cfg.ZstdBin = zstdPath
+	logger.Infof("resolved zstd binary: %s", cfg.ZstdBin)
 
 	if cfg.Source != "" {
 		cfg.SourceMode = "files"
 		cfg.SourceFiles = cfg.Source
+		logger.Infof("single source file provided, switching source-mode=files: %s", cfg.Source)
 	}
 
 	if cfg.SourceMode == "auto" {
@@ -135,11 +151,14 @@ func (cfg *config) prepare() error {
 		} else {
 			cfg.SourceMode = "files"
 		}
+		logger.Infof("resolved auto source-mode to: %s", cfg.SourceMode)
 	}
 
 	if cfg.ProcessMode == "sync" {
 		cfg.Concurrency = 1
+		logger.Infof("process-mode=sync forces concurrency=1")
 	}
+	logger.Infof("configuration prepared successfully")
 
 	return nil
 }
@@ -166,8 +185,10 @@ func resolvePgDumpPath(explicit string) (string, error) {
 	for _, candidate := range candidates {
 		resolved, err := exec.LookPath(candidate)
 		if err == nil {
+			logger.Debugf("pg_dump candidate matched: %s -> %s", candidate, resolved)
 			return resolved, nil
 		}
+		logger.Debugf("pg_dump candidate not found: %s", candidate)
 	}
 
 	return "", errors.New("pg_dump binary not found in fallback candidates")

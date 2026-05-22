@@ -34,7 +34,9 @@ type backupTask struct {
 }
 
 func buildTasks(cfg config) ([]backupTask, error) {
+	logger.Infof("building tasks from source-mode=%s", cfg.SourceMode)
 	if cfg.SourceMode == "single" {
+		logger.Infof("using single source mode with database=%s", cfg.Database)
 		return []backupTask{singleTaskFromConfig(cfg)}, nil
 	}
 
@@ -42,11 +44,16 @@ func buildTasks(cfg config) ([]backupTask, error) {
 	if err != nil {
 		return nil, err
 	}
+	logger.Infof("resolved source files: %d", len(files))
+	for _, file := range files {
+		logger.Debugf("source file: %s", file)
+	}
 
 	var tasks []backupTask
 	for _, file := range files {
 		parsed, err := parseSourceFile(cfg, file)
 		if err != nil {
+			logger.Warnf("source parse error: file=%s err=%v", file, err)
 			tasks = append(tasks, backupTask{
 				Host:          cfg.Host,
 				Port:          cfg.Port,
@@ -60,6 +67,7 @@ func buildTasks(cfg config) ([]backupTask, error) {
 			})
 			continue
 		}
+		logger.Infof("parsed tasks from source file: file=%s tasks=%d", file, len(parsed))
 		tasks = append(tasks, parsed...)
 	}
 
@@ -82,6 +90,7 @@ func singleTaskFromConfig(cfg config) backupTask {
 }
 
 func resolveSourceFiles(spec string) ([]string, error) {
+	logger.Debugf("resolving source files from spec=%q", spec)
 	inputs := splitCSV(spec)
 	if len(inputs) == 0 {
 		inputs = []string{defaultSourcesGlob}
@@ -95,6 +104,7 @@ func resolveSourceFiles(spec string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("glob %q: %w", in, err)
 		}
+		logger.Debugf("source input=%s matches=%d", in, len(matches))
 		if len(matches) == 0 {
 			if hasJSONExt(in) {
 				if _, err := os.Stat(in); err == nil {
@@ -123,6 +133,7 @@ func hasJSONExt(path string) bool {
 }
 
 func parseSourceFile(cfg config, path string) ([]backupTask, error) {
+	logger.Infof("parsing source file: %s", path)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read source file %s: %w", path, err)
@@ -143,6 +154,7 @@ func parseSourceFile(cfg config, path string) ([]backupTask, error) {
 		if err := json.Unmarshal(raw, &entries); err != nil {
 			return nil, fmt.Errorf("parse json array %s: %w", path, err)
 		}
+		logger.Debugf("parsed json array entries=%d file=%s", len(entries), path)
 		return expandEntries(cfg, entries, path), nil
 	}
 
@@ -150,6 +162,7 @@ func parseSourceFile(cfg config, path string) ([]backupTask, error) {
 	if err := json.Unmarshal(raw, &entry); err != nil {
 		return nil, fmt.Errorf("parse json object %s: %w", path, err)
 	}
+	logger.Debugf("parsed json object file=%s", path)
 	return expandEntries(cfg, []sourceEntry{entry}, path), nil
 }
 
@@ -157,6 +170,7 @@ func expandEntries(cfg config, entries []sourceEntry, sourceFile string) []backu
 	var tasks []backupTask
 	for i, entry := range entries {
 		if entry.Disabled {
+			logger.Infof("skipping disabled source entry file=%s index=%d", sourceFile, i)
 			continue
 		}
 		host := defaultIfEmpty(anyToString(entry.Host), cfg.Host)
@@ -170,6 +184,7 @@ func expandEntries(cfg config, entries []sourceEntry, sourceFile string) []backu
 
 		database := strings.TrimSpace(anyToString(entry.Database))
 		if database != "" {
+			logger.Debugf("adding task file=%s index=%d db=%s host=%s port=%d user=%s", sourceFile, i, database, host, port, username)
 			tasks = append(tasks, backupTask{
 				Host:          host,
 				Port:          port,
@@ -187,6 +202,7 @@ func expandEntries(cfg config, entries []sourceEntry, sourceFile string) []backu
 			if dbName == "" {
 				continue
 			}
+			logger.Debugf("adding task file=%s index=%d db=%s host=%s port=%d user=%s", sourceFile, i, dbName, host, port, username)
 			tasks = append(tasks, backupTask{
 				Host:          host,
 				Port:          port,

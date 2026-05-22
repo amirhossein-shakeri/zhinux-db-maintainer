@@ -20,5 +20,9 @@
     "password": "postgres",
     "databases": ["staging", "nightly"],
     "compress": false
+  },
+  {
+    "password": "postgrespw",
+    "databases": ["asaan_ersis", "asaancore", "mvpcore"]
   }
 ]

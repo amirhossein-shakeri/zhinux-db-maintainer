@@ -1,2 +1,7 @@
 **/*.DS_Store
 redis-data/
+cmd/minimal/backups/*.zst
+cmd/minimal/backups/*.report.*
+cmd/minimal/db-sources/*.json
+cmd/minimal/db-sources/*.jsonc
+!cmd/minimal/db-sources/sample.json

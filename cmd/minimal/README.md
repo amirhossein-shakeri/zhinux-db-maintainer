@@ -88,6 +88,9 @@ go run ./cmd/minimal \
   - `-report-run` (default `true`)
   - `-report-ext` (default `.report.json`)
   - `-profile-summary` (default `true`)
+- Logging:
+  - `-verbose` or `-v` enables extra debug logs.
+  - Info logs remain detailed by default for long-running visibility.
 
 ## pg_dump fallback priority
 

@@ -1,4 +1,0 @@
-{
-  "password": "postgrespw",
-  "databases": ["material-pricing", "material-pricing-dev"]
-}
