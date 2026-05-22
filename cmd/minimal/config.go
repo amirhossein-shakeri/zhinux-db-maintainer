@@ -252,6 +252,6 @@ func buildOutputPath(cfg config, outputName, host, database string, compress boo
 	if compress {
 		suffix = defaultBackupSuffix
 	}
-	name := fmt.Sprintf("%s_%s_%s%s", sanitizeForFilename(database), sanitizeForFilename(host), timestamp, suffix)
+	name := fmt.Sprintf("%s_%s_%s%s", sanitizeForFilename(database), timestamp, sanitizeForFilename(host), suffix)
 	return filepath.Join(cfg.OutputDir, name)
 }

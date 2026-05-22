@@ -13,16 +13,19 @@
     "username": "postgres",
     "password": "postgres",
     "database": "app-prod",
-    "reportDisabled": true
+    "reportDisabled": true,
+    "disabled": true
   },
   {
     "host": "192.168.1.102",
     "password": "postgres",
     "databases": ["staging", "nightly"],
-    "compress": false
+    "compress": false,
+    "disabled": true
   },
   {
     "password": "postgrespw",
-    "databases": ["asaan_ersis", "asaancore", "mvpcore"]
+    "databases": ["art", "zhi", "sou"],
+    "disabled": true
   }
 ]
