@@ -3,17 +3,17 @@ package backup
 import (
 	"time"
 
-	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
+	"github.com/amirhossein-shakeri/zhinux-platform/types"
 )
 
 type BackupJob struct {
-	ID       string
-	PublicID string
+	ID       types.ID // Internal ID(Fast joins)
+	PublicID string   // Exposed UUID at public APIs(Safe public identifiers)
 
-	DatabaseID  zhinuxtypes.ID
+	DatabaseID  types.ID
 	TriggerType BackupTrigger
 	Status      BackupStatus
 	StartedAt   *time.Time
 	FinishedAt  *time.Time
-	ArtifactID  *string
+	ArtifactID  *types.ID
 }

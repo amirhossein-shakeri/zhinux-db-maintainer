@@ -3,18 +3,24 @@ package backup
 import (
 	"time"
 
-	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
+	"github.com/amirhossein-shakeri/zhinux-platform/types"
 )
 
 type BackupArtifact struct {
-	ID       string
-	PublicID string
+	ID       types.ID // Internal ID(Fast joins)
+	PublicID string   // Exposed UUID at public APIs(Safe public identifiers)
 
-	DatabaseID      zhinuxtypes.ID
-	BackupJobID     string
+	DatabaseID      types.ID
+	BackupJobID     types.ID
 	StorageLocation string // todo: Use more detailed address? struct {Provider, Path, Bucket}
-	Size            int
+	Size            int    // Final size occupied in the storage
 	Checksum        string
+
+	// Compression
+	CompressedSize   *int
+	UncompressedSize *int
+	CompressionRatio *int
+	// CompressionAlgorithm // todo: compression alg value object enum from here or from compression service? Why?
 
 	CreatedAt time.Time
 	DeletedAt *time.Time
