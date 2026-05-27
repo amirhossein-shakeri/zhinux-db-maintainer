@@ -40,9 +40,9 @@ func (r *backupArtifactRepositoryImpl) Save(ctx context.Context, artifact *backu
 		publicID,
 		int64(artifact.DatabaseID),
 		artifact.BackupJobID,
-		artifact.StorageLocation,
-		artifact.Size,
-		artifact.Checksum,
+		artifact.StorageLocation(),
+		artifact.Size.Int64(),
+		artifact.Checksum.Value,
 		artifact.CreatedAt,
 		artifact.DeletedAt,
 		now,
@@ -96,15 +96,18 @@ func scanBackupArtifact(row interface {
 }) (*backup.BackupArtifact, error) {
 	var item backup.BackupArtifact
 	var databaseID int64
+	var storageLocation string
+	var sizeBytes int64
+	var checksum string
 
 	err := row.Scan(
 		&item.ID,
 		&item.PublicID,
 		&databaseID,
 		&item.BackupJobID,
-		&item.StorageLocation,
-		&item.Size,
-		&item.Checksum,
+		&storageLocation,
+		&sizeBytes,
+		&checksum,
 		&item.CreatedAt,
 		&item.DeletedAt,
 	)
@@ -113,6 +116,9 @@ func scanBackupArtifact(row interface {
 	}
 
 	item.DatabaseID = zhinuxtypes.ID(databaseID)
+	item.Storage = backup.StorageLocationFromURI(storageLocation)
+	item.Size = backup.ByteSize(sizeBytes)
+	item.Checksum = backup.Checksum{Algorithm: backup.ChecksumAlgorithmSHA256, Value: checksum}
 	return &item, nil
 }
 

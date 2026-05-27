@@ -10,12 +10,18 @@ type BackupPlan struct {
 	PublicID string   // Exposed UUID at public APIs(Safe public identifiers)
 
 	DatabaseID types.ID
-	Schedule   string // Cron perhaps
+	Schedule   shared.Schedule
 	Enabled    bool
 
-	RetentionPolicy    shared.RetentionPolicy
-	CompressionEnabled bool
-	EncryptionEnabled  bool
-	// Compression     CompressionConfig // todo: compression config value object is from compression service or here or shared at platform?
-	// Encryption      EncryptionConfig // todo: encryption config value objects is from encryption service or here or shared at platform?
+	Retention   shared.RetentionConfig
+	Compression CompressionConfig
+	Encryption  EncryptionConfig
+}
+
+func (p BackupPlan) CompressionEnabled() bool {
+	return p.Compression.Enabled
+}
+
+func (p BackupPlan) EncryptionEnabled() bool {
+	return p.Encryption.Enabled
 }

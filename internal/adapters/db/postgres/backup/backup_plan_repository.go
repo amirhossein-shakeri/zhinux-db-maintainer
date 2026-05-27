@@ -36,11 +36,11 @@ func (r *backupPlanRepositoryImpl) Save(ctx context.Context, plan *backup.Backup
 		plan.ID,
 		publicID,
 		int64(plan.DatabaseID),
-		plan.Schedule,
+		plan.Schedule.String(),
 		plan.Enabled,
-		string(plan.RetentionPolicy),
-		plan.CompressionEnabled,
-		plan.EncryptionEnabled,
+		string(plan.Retention.Policy),
+		plan.Compression.Enabled,
+		plan.Encryption.Enabled,
 		now,
 		now,
 	)
@@ -92,24 +92,38 @@ func scanBackupPlan(row interface {
 }) (*backup.BackupPlan, error) {
 	var item backup.BackupPlan
 	var retentionPolicy string
+	var schedule string
+	var compressionEnabled bool
+	var encryptionEnabled bool
 	var databaseID int64
 
 	err := row.Scan(
 		&item.ID,
 		&item.PublicID,
 		&databaseID,
-		&item.Schedule,
+		&schedule,
 		&item.Enabled,
 		&retentionPolicy,
-		&item.CompressionEnabled,
-		&item.EncryptionEnabled,
+		&compressionEnabled,
+		&encryptionEnabled,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	item.DatabaseID = zhinuxtypes.ID(databaseID)
-	item.RetentionPolicy = shared.RetentionPolicy(retentionPolicy)
+	item.Schedule = shared.NewCronSchedule(schedule, "")
+	item.Retention = shared.RetentionConfig{Policy: shared.RetentionPolicy(retentionPolicy)}
+	if compressionEnabled {
+		item.Compression = backup.DefaultZstdCompression()
+	} else {
+		item.Compression = backup.NoCompression()
+	}
+	if encryptionEnabled {
+		item.Encryption = backup.EncryptionConfig{Enabled: true}
+	} else {
+		item.Encryption = backup.NoEncryption()
+	}
 	return &item, nil
 }
 

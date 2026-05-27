@@ -91,9 +91,14 @@ func (r *backupJobRepositoryImpl) MarkFinished(
 	id string,
 	status backup.BackupStatus,
 	finishedAt time.Time,
-	artifactID *string,
+	artifactID *zhinuxtypes.ID,
 ) error {
-	_, err := r.pool.Exec(ctx, backupJobMarkFinishedSQL, id, string(status), finishedAt, artifactID)
+	var artifactIDValue *int64
+	if artifactID != nil {
+		value := int64(*artifactID)
+		artifactIDValue = &value
+	}
+	_, err := r.pool.Exec(ctx, backupJobMarkFinishedSQL, id, string(status), finishedAt, artifactIDValue)
 	return err
 }
 
@@ -104,6 +109,7 @@ func scanBackupJob(row interface {
 	var trigger string
 	var status string
 	var databaseID int64
+	var artifactID *int64
 
 	err := row.Scan(
 		&item.ID,
@@ -113,7 +119,7 @@ func scanBackupJob(row interface {
 		&status,
 		&item.StartedAt,
 		&item.FinishedAt,
-		&item.ArtifactID,
+		&artifactID,
 	)
 	if err != nil {
 		return nil, err
@@ -122,6 +128,10 @@ func scanBackupJob(row interface {
 	item.DatabaseID = zhinuxtypes.ID(databaseID)
 	item.TriggerType = backup.BackupTrigger(trigger)
 	item.Status = backup.BackupStatus(status)
+	if artifactID != nil {
+		typedArtifactID := zhinuxtypes.ID(*artifactID)
+		item.ArtifactID = &typedArtifactID
+	}
 	return &item, nil
 }
 
