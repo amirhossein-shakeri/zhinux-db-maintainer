@@ -1,0 +1,39 @@
+package redis_database
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/database"
+	outbound_ports "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/ports/outbound"
+	"github.com/redis/go-redis/v9"
+)
+
+const (
+	AppNameKey = "dbm" // DB Maintainer
+)
+
+type redisDatabaseRepositoryImpl struct {
+	rdb *redis.Client
+}
+
+func NewRedisDatabaseRepositoryImpl(
+	rdb *redis.Client,
+) outbound_ports.DatabaseRepository {
+	// TODO: Add logging
+
+	return &redisDatabaseRepositoryImpl{
+		rdb: rdb,
+	}
+}
+
+func (r *redisDatabaseRepositoryImpl) Save(
+	ctx context.Context, db *database.Database,
+) error {
+	// Save the
+}
+
+func (r *redisDatabaseRepositoryImpl) keyByID(id string) string {
+	// {app}:{entity}:{id}
+	return fmt.Sprintf("%s:database:%s", AppNameKey, id)
+}
