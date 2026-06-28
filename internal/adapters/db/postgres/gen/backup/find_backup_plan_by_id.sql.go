@@ -12,9 +12,18 @@ import (
 )
 
 const findBackupPlanByID = `-- name: FindBackupPlanByID :one
-SELECT id, public_id, database_id, schedule, enabled, retention_policy, compression_enabled, encryption_enabled
+SELECT
+    id,
+    public_id,
+    database_id,
+    schedule,
+    enabled,
+    retention_policy,
+    compression_enabled,
+    encryption_enabled
 FROM backup_plans
-WHERE id = $1
+WHERE
+    id = $1
 `
 
 type FindBackupPlanByIDRow struct {

@@ -12,9 +12,19 @@ import (
 )
 
 const findBackupArtifactByID = `-- name: FindBackupArtifactByID :one
-SELECT id, public_id, database_id, backup_job_id, storage_location, size_bytes, checksum, created_at, deleted_at
+SELECT
+    id,
+    public_id,
+    database_id,
+    backup_job_id,
+    storage_location,
+    size_bytes,
+    checksum,
+    created_at,
+    deleted_at
 FROM backup_artifacts
-WHERE id = $1
+WHERE
+    id = $1
 `
 
 type FindBackupArtifactByIDRow struct {

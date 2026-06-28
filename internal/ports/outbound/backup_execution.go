@@ -26,7 +26,7 @@ type DumpRequest struct {
 }
 
 type DumpResult struct {
-	BytesWritten backup.ByteSize
+	BytesWritten int
 	Duration     time.Duration
 	Stderr       string
 }
@@ -62,7 +62,7 @@ type PutArtifactRequest struct {
 
 type PutArtifactResult struct {
 	Storage  backup.StorageLocation
-	Size     backup.ByteSize
+	Size     int
 	Checksum backup.Checksum
 }
 

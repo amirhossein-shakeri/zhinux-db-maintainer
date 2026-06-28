@@ -12,21 +12,34 @@ import (
 )
 
 const upsertBackupArtifact = `-- name: UpsertBackupArtifact :exec
-INSERT INTO backup_artifacts (
-    id,
-    public_id,
-    database_id,
-    backup_job_id,
-    storage_location,
-    size_bytes,
-    checksum,
-    created_at,
-    deleted_at,
-    updated_at
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-ON CONFLICT (id) DO UPDATE
-SET public_id = EXCLUDED.public_id,
+INSERT INTO
+    backup_artifacts (
+        id,
+        public_id,
+        database_id,
+        backup_job_id,
+        storage_location,
+        size_bytes,
+        checksum,
+        created_at,
+        deleted_at,
+        updated_at
+    )
+VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10
+    ) ON CONFLICT (id) DO
+UPDATE
+SET
+    public_id = EXCLUDED.public_id,
     storage_location = EXCLUDED.storage_location,
     size_bytes = EXCLUDED.size_bytes,
     checksum = EXCLUDED.checksum,

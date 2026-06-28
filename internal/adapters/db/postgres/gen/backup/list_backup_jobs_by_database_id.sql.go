@@ -12,9 +12,18 @@ import (
 )
 
 const listBackupJobsByDatabaseID = `-- name: ListBackupJobsByDatabaseID :many
-SELECT id, public_id, database_id, trigger_type, status, started_at, finished_at, artifact_id
+SELECT
+    id,
+    public_id,
+    database_id,
+    trigger_type,
+    status,
+    started_at,
+    finished_at,
+    artifact_id
 FROM backup_jobs
-WHERE database_id = $1
+WHERE
+    database_id = $1
 ORDER BY created_at DESC
 `
 
