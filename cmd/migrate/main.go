@@ -14,6 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/file"
 )
 
+// todo: export to zhinux-platform
 func mustGetenv(key, fallback string) string {
 	if val, ok := os.LookupEnv(key); ok {
 		return val
