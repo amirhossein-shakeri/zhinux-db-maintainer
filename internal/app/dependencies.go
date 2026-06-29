@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	postgresbackup "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/db/postgres/backup"
-	postgresdatabase "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/db/postgres/database"
-	postgresrestore "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/db/postgres/restore"
+	postgresbackup "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/persistence/postgres/backup"
+	postgresdatabase "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/persistence/postgres/database"
+	postgresrestore "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/persistence/postgres/restore"
 	platformcache "github.com/amirhossein-shakeri/zhinux-platform/cache"
 	"github.com/amirhossein-shakeri/zhinux-platform/health"
 	"github.com/jackc/pgx/v5/pgxpool"

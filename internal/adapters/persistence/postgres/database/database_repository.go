@@ -263,7 +263,7 @@ func (r *databaseRepositoryImpl) HardDelete(ctx context.Context, id string) erro
 	return r.q.HardDeleteDatabase(ctx, parsedID)
 }
 
-func mapQueryRowToDomain(row dbq.FindDatabaseByIDRow) *database.Database {
+func mapQueryRowToDomain(row dbq.Database) *database.Database {
 	item := &database.Database{
 		ID:       zhinuxtypes.ID(row.ID),
 		Title:    row.Title,

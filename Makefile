@@ -23,6 +23,7 @@ help:
 	@echo " make migrate-up       apply migrations(with Docker fallback)"
 	@echo " make migrate-down     rollback one migration"
 	@echo " make migrate-version  show migration version"
+	@echo " make migrate-reset    full reset db migrations and apply them from scratch" # TODO: Implement
 	@echo " make schema           build schema snapshot(with Docker fallback)"
 	@echo " make generate         run sqlc"
 	@echo " make dev-setup        full local setup"

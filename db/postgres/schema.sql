@@ -100,7 +100,7 @@ CREATE TABLE public.backup_plans (
 
 CREATE TABLE public.databases (
     id bigint NOT NULL,
-    public_id uuid,
+    public_id uuid DEFAULT gen_random_uuid() NOT NULL,
     title text NOT NULL,
     type text NOT NULL,
     host text NOT NULL,
