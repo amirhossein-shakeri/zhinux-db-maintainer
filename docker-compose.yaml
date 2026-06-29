@@ -1,4 +1,29 @@
 services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: postgres-zhinux-db-maintainer
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:5432:5432" # Should be removed in production
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zhinux-db-maintainer}
+      POSTGRES_USER: ${POSTGRES_USER:-zhinux-db-maintainer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - zhinux_db_maintainer
+
   redis:
     image: redis:latest # redis:7.2
     container_name: zhinux-db-maintainer-redis
@@ -29,3 +54,9 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+
+volumes:
+  postgres_data:
+
+networks:
+  zhinux_db_maintainer:

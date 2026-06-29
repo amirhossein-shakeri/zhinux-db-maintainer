@@ -24,3 +24,8 @@ internal/adapters/db/postgres/sql/
 - Use one `sqlc` block per domain package (`database`, `backup`, `restore`).
 - Include only the schema folders needed by each domain block.
 - Prefer additive schema changes with migration files rather than rewriting large SQL files.
+
+
+_Updates_
+## Schema 
+Schema is derived from applying all migrations on a fresh DB and then dumping from the DB using `pg_dump --schema-only > schema.sql` so that `sqlc` can generate type-safe queries and schemas won't drift from migrations.

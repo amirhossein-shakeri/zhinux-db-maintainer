@@ -1,0 +1,6 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_DB: test
+      POSTGRES_HOST_AUTH_METHOD: trust
