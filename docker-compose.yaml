@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "127.0.0.1:5432:5432" # Should be removed in production
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432" # Should be removed in production
 
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-zhinux-db-maintainer}
@@ -16,9 +16,18 @@ services:
       - postgres_data:/var/lib/postgresql
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready",
+          "-q",
+          "-U",
+          "$(POSTGRES_USER)",
+          "-d",
+          "$(POSTGRES_DB)",
+        ]
       interval: 5s
-      timeout: 5s
+      timeout: 30s
       retries: 5
 
     networks:

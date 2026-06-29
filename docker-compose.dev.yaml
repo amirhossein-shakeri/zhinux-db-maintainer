@@ -1,9 +1,14 @@
 services:
   postgres:
     environment:
-      POSTGRES_USER: dev
-      POSTGRES_PASSWORD: dev
-      POSTGRES_DB: app
+      POSTGRES_HOST_AUTH_METHOD: trust
+      # POSTGRES_USER: dev
+      # POSTGRES_PASSWORD: dev
+      # POSTGRES_DB: app
+    volumes:
+      - ./db/postgres/migrations:/migrations
+    ports:
+      # - "5432:5432" # Explicit for dev
 
   db-tools:
     image: postgres:18-alpine
@@ -11,3 +16,13 @@ services:
     working_dir: /workspace
     volumes:
       - .:/workspace
+
+  # pgadmin:
+  #   image: dpage/pgadmin4:2
+  #   container_name: zhinux-pgadmin
+  #   ports:
+  #     - "5050:80"
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: dev@zhinux.local
+  #     PGADMIN_DEFAULT_PASSWORD: dev
+  #   restart: unless-stopped

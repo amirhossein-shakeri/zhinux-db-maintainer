@@ -7,11 +7,25 @@ import (
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/joho/godotenv"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/file"
 )
+
+func mustGetenv(key, fallback string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+
+	if fallback != "" {
+		return fallback
+	}
+
+	log.Fatalf("Environment variable %s is not set", key)
+	return ""
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -20,9 +34,24 @@ func main() {
 
 	cmd := os.Args[1]
 
-	dbURL := os.Getenv("DATABASE_URL")
+	// Load .env file if present
+	godotenv.Load()
+
+	pgUser := mustGetenv("POSTGRES_USER", "postgres")
+	pgPass := mustGetenv("POSTGRES_PASSWORD", "postgres")
+	pgDBName := mustGetenv("POSTGRES_DB_NAME", "zhinux-db-maintainer")
+	pgHost := mustGetenv("POSTGRES_HOST", "localhost")
+	pgPort := mustGetenv("POSTGRES_PORT", "5432")
+
+	connStr := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		pgUser, pgPass, pgHost, pgPort, pgDBName,
+	)
+
+	dbURL := os.Getenv("POSTGRES_DB_URL")
+	dbURL = connStr
 	if dbURL == "" {
-		log.Fatalf("DATABASE_URL is required")
+		log.Fatalf("POSTGRES_DB_URL is required")
 	}
 
 	db, err := sql.Open("pgx", dbURL)
