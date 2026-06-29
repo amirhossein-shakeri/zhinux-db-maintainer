@@ -7,18 +7,19 @@ import (
 	"strings"
 	"time"
 
-	databaseq "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/db/postgres/gen/database"
+	dbq "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/adapters/persistence/postgres/gen"
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/database"
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/shared"
 	outbound_ports "github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/ports/outbound"
 	zhinuxtypes "github.com/amirhossein-shakeri/zhinux-platform/types"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type databaseRepositoryImpl struct {
-	q    *databaseq.Queries
+	q    *dbq.Queries
 	pool *pgxpool.Pool
 }
 
@@ -26,7 +27,7 @@ func NewDatabaseRepository(
 	pool *pgxpool.Pool,
 ) outbound_ports.DatabaseRepository {
 	return &databaseRepositoryImpl{
-		q:    databaseq.New(pool),
+		q:    dbq.New(pool),
 		pool: pool,
 	}
 }
@@ -49,7 +50,7 @@ func (r *databaseRepositoryImpl) Save(
 	// Always update updated_at to now
 	db.UpdatedAt = now
 
-	err := r.q.UpsertDatabase(ctx, databaseq.UpsertDatabaseParams{
+	err := r.q.UpsertDatabase(ctx, dbq.UpsertDatabaseParams{
 		ID:        int64(db.ID),
 		Title:     db.Title,
 		Type:      string(db.Typ),
@@ -71,6 +72,26 @@ func (r *databaseRepositoryImpl) FindByID(ctx context.Context, id string) (*data
 	}
 
 	row, err := r.q.FindDatabaseByID(ctx, parsedID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return mapQueryRowToDomain(row), nil
+}
+
+func (r *databaseRepositoryImpl) FindByPublicID(ctx context.Context, publicID uuid.UUID) (*database.Database, error) {
+	// TODO: Extract utility helper to parse string to pgtype UUID validating through google's UUID
+	// parsedUUID, err := uuid.Parse(publicID)
+	// if err != nil {
+	// 	return nil, err // todo: Wrap error
+	// }
+
+	uuid := pgtype.UUID{Bytes: publicID, Valid: true}
+
+	row, err := r.q.FindDatabaseByPublicID(ctx, uuid)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -242,7 +263,7 @@ func (r *databaseRepositoryImpl) HardDelete(ctx context.Context, id string) erro
 	return r.q.HardDeleteDatabase(ctx, parsedID)
 }
 
-func mapQueryRowToDomain(row databaseq.FindDatabaseByIDRow) *database.Database {
+func mapQueryRowToDomain(row dbq.FindDatabaseByIDRow) *database.Database {
 	item := &database.Database{
 		ID:       zhinuxtypes.ID(row.ID),
 		Title:    row.Title,

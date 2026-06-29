@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS databases (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    public_id UUID UNIQUE, -- DEFAULT gen_random_uuid_v7(),
+    public_id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(), -- Postgres 17+ generates UUIDv7
     title TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('postgres', 'mongo')),
+    type TEXT NOT NULL CHECK (type IN ('postgres', 'mongo')), -- TODO: Use DB Enums
     host TEXT NOT NULL,
     port INT NOT NULL CHECK (port > 0),
     username TEXT NOT NULL,

@@ -5,6 +5,7 @@ import (
 
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/database"
 	"github.com/amirhossein-shakeri/zhinux-db-maintainer/internal/domain/shared"
+	"github.com/google/uuid"
 )
 
 type DatabaseRepository interface {
@@ -13,7 +14,7 @@ type DatabaseRepository interface {
 
 	// Try finding a specific database by ID, if not found, returns nil, nil not throwing an error like `GetByID`
 	FindByID(ctx context.Context, id string) (*database.Database, error)
-	FindByPublicID(ctx context.Context, publicID string) (*database.Database, error)
+	FindByPublicID(ctx context.Context, publicID uuid.UUID) (*database.Database, error)
 
 	// Filter a list of databases with the given filter and pagination
 	Filter(ctx context.Context, f *database.Filter,

@@ -7,10 +7,11 @@ sql:
       - "db/postgres/schema.sql"
 
     queries:
+      - "db/postgres/queries/**/*.sql"
       # - "db/postgres/queries" # error parsing queries: no queries contained in paths db/postgres/queries
-      - "db/postgres/queries/backup"
-      - "db/postgres/queries/database"
-      - "db/postgres/queries/restore"
+      # - "db/postgres/queries/backup"
+      # - "db/postgres/queries/database"
+      # - "db/postgres/queries/restore"
 
     gen:
       go:

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS backup_plans (
     id TEXT PRIMARY KEY,
-    public_id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid (),
+    public_id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     database_id BIGINT NOT NULL REFERENCES databases (id) ON DELETE CASCADE,
     schedule TEXT NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
