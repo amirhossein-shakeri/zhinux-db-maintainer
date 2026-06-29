@@ -72,13 +72,16 @@ schema:
 	@echo "Building schema snapshot..."
 	# $(PG_DUMP) $(POSTGRES_DB_URL) --schema-only --no-owner --no-privileges > db/postgres/schema.sql
 	@if [ -x "$(PG_DUMP_CMD)" ]; then \
-		pg_dump $(POSTGRES_DB_URL) --schema-only --no-owner --no-privileges > db/postgres/schema.sql; \
+		pg_dump $(POSTGRES_DB_URL) --schema-only --no-owner --no-privileges > db/postgres/schema.sql.tmp; \
 	else \
 		docker run --rm -e PGPASSWORD=$(POSTGRES_PASSWORD) \
 			--network host postgres:15 \
 			pg_dump -U $(POSTGRES_USER) -h $(POSTGRES_HOST) -p $(POSTGRES_PORT) $(POSTGRES_DB_NAME) \
-			--schema-only --no-owner --no-privileges > db/postgres/schema.sql; \
+			--schema-only --no-owner --no-privileges > db/postgres/schema.sql.tmp; \
 	fi
+	# Filter out lines that start with a backslash
+	grep -v '^\\' db/postgres/schema.sql.tmp > db/postgres/schema.sql
+	rm db/postgres/schema.sql.tmp
 
 
 .PHONY: generate

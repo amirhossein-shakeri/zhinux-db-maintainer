@@ -14,12 +14,15 @@ func (a *App) initServers() error {
 	if err := a.initHTTPServer(); err != nil {
 		return err
 	}
+
 	if err := a.initGRPCServer(); err != nil {
 		return err
 	}
+
 	if a.httpServer == nil && a.grpcServer == nil {
 		return errors.New("both HTTP and gRPC servers are disabled")
 	}
+
 	return nil
 }
 
@@ -33,6 +36,10 @@ func (a *App) initHTTPServer() error {
 	mux.Handle("/livez", healthHandler)
 	mux.Handle("/readyz", healthHandler)
 	mux.Handle("/healthz", healthHandler)
+	mux.Handle("/varz", healthHandler)
+	mux.Handle("/flagz", healthHandler)
+	mux.Handle("/statusz", healthHandler)
+	mux.Handle("/configz", healthHandler)
 	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = writer.Write([]byte("zhinux-db-maintainer"))
 	})

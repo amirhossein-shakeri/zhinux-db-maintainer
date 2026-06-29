@@ -36,6 +36,7 @@ func New(ctx context.Context, build BuildInfo) (*App, error) {
 	if err := app.initDependencies(ctx); err != nil {
 		return nil, err
 	}
+
 	if err := app.initServers(); err != nil {
 		return nil, err
 	}
@@ -59,11 +60,14 @@ func NormalizeBuildInfo(build BuildInfo) BuildInfo {
 	if strings.TrimSpace(build.Version) == "" {
 		build.Version = "dev"
 	}
+
 	if strings.TrimSpace(build.Commit) == "" {
 		build.Commit = "unknown"
 	}
+
 	if strings.TrimSpace(build.BuildDate) == "" {
 		build.BuildDate = "unknown"
 	}
+
 	return build
 }
